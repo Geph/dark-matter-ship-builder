@@ -143,11 +143,66 @@ Pushes to `main` deploy to **GitHub Pages** via
 The footer shows the version from `package.json` (e.g. `0.1.0` → **v0.1**).
 
 Because `main` is protected (PR + CI required), the deploy workflow does **not**
-commit back to the branch. When you want to publish a new release label, run
-`npm run version:bump` locally and include the updated `package.json` and
-README in your PR.
+commit back to the branch. Bump the version in your PR when you want the live
+site footer and README to show a new release.
 
 In repo **Settings → Pages**, set **Source** to **GitHub Actions**.
+
+### Updating the release version
+
+The footer label comes from `package.json` at **build time** (e.g. `0.2.0` →
+**v0.2**). The bump script does **not** change what the current deploy shows—it
+records that release in the README and advances `package.json` for the *next*
+deploy.
+
+When you run `npm run version:bump` with `"version": "0.2.0"` in
+`package.json`, the script:
+
+1. Sets **Current release** in this README to **v0.2** (the version you just shipped)
+2. Adds a dated line under **Changelog** for v0.2
+3. Bumps `package.json` to `0.3.0` (the version slot for the next live release)
+
+**Example:** v0.1 is already live (`package.json` is `0.1.0`). You merged a
+feature branch and the site now reflects that work—you want the footer to read
+**v0.2** on the next deploy.
+
+**Step 1 — Set the version for the upcoming deploy** (in your feature PR, or a
+prep commit on `main`):
+
+```json
+// package.json
+"version": "0.2.0"
+```
+
+Merge the PR. GitHub Pages builds from `0.2.0` and the footer shows **v0.2**.
+
+**Step 2 — After that deploy**, run the bump on a branch and open a PR (or add to
+your next feature PR before merge):
+
+```bash
+npm run version:bump
+git add package.json README.md
+git commit -m "chore: record v0.2 release and bump to 0.3.0"
+git push
+```
+
+That produces something like:
+
+| File | Before | After |
+|------|--------|-------|
+| `README.md` | **Current release:** v0.1 | **Current release:** v0.2 + changelog entry |
+| `package.json` | `"0.2.0"` | `"0.3.0"` |
+
+Merge the bump PR. The site stays on **v0.2** until a later PR changes
+`package.json` to `0.3.0` and deploys again.
+
+**First release from a fresh clone** (`0.1.0` already in repo): merge to deploy
+**v0.1**, then run `npm run version:bump` once so the repo moves to `0.2.0` for
+the next cycle.
+
+**Tip:** Never run `version:bump` in the same commit that introduces a new
+`package.json` version you want to go live—the bump advances the file *past*
+the release you are documenting.
 
 ## Optional: Supabase backend
 
