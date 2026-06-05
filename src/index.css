@@ -1,0 +1,277 @@
+@import 'tailwindcss';
+
+/* ============================================================
+   DARK MATTER // SHIP BUILDER — Sci-Fi Terminal Theme
+   ============================================================ */
+
+@theme {
+  --color-void: #0a0c14;
+  --color-void-2: #0d1018;
+  --color-panel: #111726;
+  --color-cyan: #00e5ff;
+  --color-cyan-dim: #00e5ff40;
+  --color-amber: #ffb300;
+  --color-danger: #ff4444;
+  --color-ok: #38ff9c;
+  --font-display: 'Orbitron', sans-serif;
+  --font-body: 'Exo 2', sans-serif;
+  --font-mono: 'Share Tech Mono', monospace;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: #0a0c14;
+  background-image:
+    radial-gradient(circle at 20% 10%, rgba(0, 229, 255, 0.08), transparent 40%),
+    radial-gradient(circle at 80% 90%, rgba(255, 179, 0, 0.05), transparent 45%),
+    linear-gradient(rgba(0, 229, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 229, 255, 0.025) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 44px 44px, 44px 44px;
+  color: #c7d2e0;
+  font-family: 'Exo 2', sans-serif;
+}
+
+/* Animated starfield layer */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background-image:
+    radial-gradient(1px 1px at 25% 35%, #fff, transparent),
+    radial-gradient(1px 1px at 65% 15%, #cfefff, transparent),
+    radial-gradient(1px 1px at 85% 55%, #fff, transparent),
+    radial-gradient(1px 1px at 15% 75%, #bdf, transparent),
+    radial-gradient(1px 1px at 50% 85%, #fff, transparent),
+    radial-gradient(2px 2px at 40% 50%, #9ef, transparent);
+  background-repeat: repeat;
+  background-size: 600px 600px;
+  opacity: 0.5;
+  animation: drift 120s linear infinite;
+}
+
+/* CRT scanline overlay */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 0, 0, 0.18) 3px,
+    rgba(0, 0, 0, 0) 4px
+  );
+  opacity: 0.35;
+}
+
+@keyframes drift {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 600px 1200px;
+  }
+}
+
+/* ---------- Reusable HUD utility classes ---------- */
+
+.font-display {
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 0.06em;
+}
+.font-mono-hud {
+  font-family: 'Share Tech Mono', monospace;
+}
+
+.panel {
+  background: linear-gradient(160deg, rgba(17, 23, 38, 0.92), rgba(13, 16, 24, 0.92));
+  border: 1px solid rgba(0, 229, 255, 0.28);
+  box-shadow:
+    0 0 12px rgba(0, 229, 255, 0.18),
+    inset 0 0 24px rgba(0, 229, 255, 0.04);
+  border-radius: 4px;
+  position: relative;
+}
+
+.panel-corner::before,
+.panel-corner::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-color: #00e5ff;
+}
+.panel-corner::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid;
+  border-left: 2px solid;
+}
+.panel-corner::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid;
+  border-right: 2px solid;
+}
+
+.glow-text {
+  text-shadow: 0 0 8px rgba(0, 229, 255, 0.7);
+}
+.glow-amber {
+  text-shadow: 0 0 8px rgba(255, 179, 0, 0.7);
+}
+
+.btn {
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  padding: 0.6rem 1.1rem;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 229, 255, 0.5);
+  background: rgba(0, 229, 255, 0.06);
+  color: #00e5ff;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.btn:hover:not(:disabled) {
+  background: rgba(0, 229, 255, 0.16);
+  box-shadow: 0 0 16px rgba(0, 229, 255, 0.5);
+  transform: translateY(-1px);
+}
+.btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.btn-amber {
+  border-color: rgba(255, 179, 0, 0.6);
+  background: rgba(255, 179, 0, 0.08);
+  color: #ffb300;
+}
+.btn-amber:hover:not(:disabled) {
+  background: rgba(255, 179, 0, 0.18);
+  box-shadow: 0 0 16px rgba(255, 179, 0, 0.5);
+}
+.btn-danger {
+  border-color: rgba(255, 68, 68, 0.6);
+  background: rgba(255, 68, 68, 0.08);
+  color: #ff6b6b;
+}
+.btn-danger:hover:not(:disabled) {
+  background: rgba(255, 68, 68, 0.18);
+  box-shadow: 0 0 16px rgba(255, 68, 68, 0.4);
+}
+.btn-solid {
+  background: linear-gradient(90deg, #00e5ff, #00a7bd);
+  color: #02121a;
+  border-color: #00e5ff;
+  font-weight: 700;
+}
+.btn-solid:hover:not(:disabled) {
+  box-shadow: 0 0 22px rgba(0, 229, 255, 0.7);
+}
+
+input[type='text'],
+input[type='number'],
+input[type='email'],
+input[type='password'],
+textarea,
+select {
+  background: rgba(2, 8, 16, 0.7);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  color: #d7f6ff;
+  border-radius: 3px;
+  padding: 0.55rem 0.75rem;
+  font-family: 'Exo 2', sans-serif;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: #00e5ff;
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.4);
+}
+
+/* HUD progress bars */
+.hud-bar {
+  height: 10px;
+  background: rgba(2, 8, 16, 0.8);
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.hud-bar > span {
+  display: block;
+  height: 100%;
+  transition: width 0.4s ease;
+}
+
+/* Dice roll flash animation */
+@keyframes rollflash {
+  0% {
+    filter: brightness(2.2);
+    transform: scale(1.02);
+  }
+  100% {
+    filter: brightness(1);
+    transform: scale(1);
+  }
+}
+.roll-flash {
+  animation: rollflash 0.5s ease;
+}
+
+@keyframes powerup {
+  0% {
+    box-shadow: 0 0 0 rgba(0, 229, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 18px rgba(0, 229, 255, 0.55);
+  }
+}
+
+.scrollbar-hud::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scrollbar-hud::-webkit-scrollbar-track {
+  background: rgba(2, 8, 16, 0.6);
+}
+.scrollbar-hud::-webkit-scrollbar-thumb {
+  background: rgba(0, 229, 255, 0.4);
+  border-radius: 4px;
+}
+
+@media print {
+  body::before,
+  body::after {
+    display: none !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+    color: #000;
+  }
+  .print-card {
+    color: #000 !important;
+    background: #fff !important;
+    border-color: #000 !important;
+    box-shadow: none !important;
+  }
+}
