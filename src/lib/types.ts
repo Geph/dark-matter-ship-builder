@@ -43,6 +43,8 @@ export interface CrewMemberData {
   attackBonus: number;
   /** Mega spells selected for the Gunner (Arcane Cannon, pp. 402–405). */
   megaSpells: string[];
+  /** Portrait shown on the ship sheet crew action panel. */
+  imageDataUrl?: string | null;
 }
 
 /** The full persisted ship record. Mirrors the data-model in the spec. */

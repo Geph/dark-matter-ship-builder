@@ -372,6 +372,7 @@ export default function StatBlock({
                     roleId={roleId}
                     roleLabel={role.label}
                     memberName={member?.name}
+                    portraitUrl={member?.imageDataUrl}
                     skillModifier={member?.skillModifier ?? 0}
                     attackBonus={
                       roleId === 'gunner'

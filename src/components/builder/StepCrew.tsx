@@ -5,6 +5,7 @@ import { MEGA_SPELLS } from '../../data/megaSpells';
 import { statsForLevel } from '../../data/shipStats';
 import { FIGHTER_CATALOG, fighterHullById } from '../../data/fighters';
 import { customFighterMhp, effectiveBudget, setFighterBuildHull } from '../../lib/rules';
+import PortraitUpload from '../PortraitUpload';
 
 interface Props {
   ship: Ship;
@@ -16,6 +17,7 @@ const emptyMember = (): CrewMemberData => ({
   skillModifier: 0,
   attackBonus: 0,
   megaSpells: [],
+  imageDataUrl: null,
 });
 
 export default function StepCrew({ ship, update }: Props) {
@@ -73,6 +75,19 @@ export default function StepCrew({ ship, update }: Props) {
         [roleId]: { ...current, [key]: value },
       };
       return { ...s, crewMembers };
+    });
+  };
+
+  const updateMemberPortrait = (roleId: string, imageDataUrl: string | null) => {
+    update((s) => {
+      const current = s.crewMembers[roleId] ?? emptyMember();
+      return {
+        ...s,
+        crewMembers: {
+          ...s.crewMembers,
+          [roleId]: { ...current, imageDataUrl },
+        },
+      };
     });
   };
 
@@ -253,6 +268,16 @@ export default function StepCrew({ ship, update }: Props) {
                       )}
                     </label>
                   ))}
+
+                  <PortraitUpload
+                    label="CREW PORTRAIT"
+                    hint="Optional picture shown on the ship sheet crew action panel."
+                    value={member?.imageDataUrl}
+                    onChange={(url) => updateMemberPortrait(role.id, url)}
+                    aspectRatio={1}
+                    maxWidth={320}
+                    compact
+                  />
 
                   {role.id === 'gunner' && (
                     <label className="block mt-2">

@@ -127,6 +127,12 @@ body::after {
   border-right: 2px solid;
 }
 
+/* Uploaded photos sit above CRT scanlines and skip corner brackets. */
+.media-clean {
+  position: relative;
+  z-index: 10000;
+}
+
 .glow-text {
   text-shadow: 0 0 8px rgba(0, 229, 255, 0.7);
 }

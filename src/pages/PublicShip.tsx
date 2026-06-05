@@ -70,11 +70,11 @@ export default function PublicShip() {
       </div>
 
       {ship.shipImageDataUrl && (
-        <div className="mb-6 panel panel-corner p-3 sm:p-4 flex justify-center bg-void/40">
+        <div className="mb-6 panel p-2 sm:p-3 bg-void/40">
           <img
             src={ship.shipImageDataUrl}
             alt={ship.name ? `${ship.name} portrait` : 'Ship portrait'}
-            className="max-h-72 sm:max-h-96 w-full object-contain rounded-sm"
+            className="media-clean w-full aspect-video object-cover rounded-sm"
           />
         </div>
       )}

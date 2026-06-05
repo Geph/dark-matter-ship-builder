@@ -11,6 +11,7 @@ interface Props {
   roleId: string;
   roleLabel: string;
   memberName?: string;
+  portraitUrl?: string | null;
   skillModifier: number;
   attackBonus: number;
   actions: CrewActionDef[];
@@ -21,6 +22,7 @@ export default function CrewActionPanel({
   roleId,
   roleLabel,
   memberName,
+  portraitUrl,
   skillModifier,
   attackBonus,
   actions,
@@ -77,13 +79,21 @@ export default function CrewActionPanel({
   };
 
   return (
-    <li className="text-slate-200 panel p-3 space-y-2">
-      <div className="font-display text-cyan text-xs tracking-wide">
-        {roleLabel}
-        {memberName ? ` — ${memberName}` : ''}
-      </div>
+    <li className="text-slate-200 panel p-3">
+      {portraitUrl && (
+        <img
+          src={portraitUrl}
+          alt={memberName ? `${memberName} portrait` : `${roleLabel} portrait`}
+          className="media-clean float-right ml-3 mb-2 w-24 sm:w-28 aspect-square object-cover rounded-sm border border-cyan/35 shadow-[0_0_16px_rgba(0,229,255,0.25)]"
+        />
+      )}
+      <div className="min-w-0 space-y-2">
+        <div className="font-display text-cyan text-xs tracking-wide">
+          {roleLabel}
+          {memberName ? ` — ${memberName}` : ''}
+        </div>
 
-      <ul className="space-y-2">
+        <ul className="space-y-2">
         {actions.map((action) => {
           const avail = isActionAvailable(action, ship);
           return (
@@ -304,6 +314,7 @@ export default function CrewActionPanel({
           </li>
         )}
       </ul>
+      </div>
     </li>
   );
 }

@@ -156,6 +156,7 @@ function normalizeShip(ship: Ship & { megaSpells?: string[] }): Ship {
       skillModifier: member.skillModifier ?? 0,
       attackBonus: member.attackBonus ?? 0,
       megaSpells: member.megaSpells ?? [],
+      imageDataUrl: member.imageDataUrl ?? null,
     };
   }
   const { megaSpells: _legacy, ...rest } = ship;
