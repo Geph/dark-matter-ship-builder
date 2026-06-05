@@ -13,6 +13,8 @@ arcs.
 
 **Current release:** v0.1
 
+![Dark Matter Ship Builder — landing page overview](docs/screenshots/overview.png)
+
 ### Changelog
 
 - **v0.1** — Initial public release: full ship builder, fighter builds and bays, crew actions, game-icons emblems, ship sheet, GitHub Pages deploy, and versioned releases.
@@ -28,6 +30,8 @@ arcs.
 | 3 | **Loadout** | Spend Credits on systems, weapons, upgrades, and DM engine class upgrades. Configure **fighter bays** (catalog or saved custom fighters). Auto-included systems show at the top with replacement cost. GM can override the credit budget (with permission warning). |
 | 4 | **Designation** | Name the ship, upload a **portrait** for the ship sheet, christen into the registry, and review the stat block. |
 
+![Loadout step with hull schematic and slot tracking](docs/screenshots/builder.png)
+
 ### Builder — Ship Configuration
 
 The builder’s **Ship Configuration** panel shows a top-down hull with five
@@ -38,6 +42,8 @@ weapon-mount arcs:
 Fighter bay configuration buttons sit below hardpoint slots. Fixed-mount weapons
 are restricted to appropriate arcs; fighter escape pods are never auto-installed
 on motherships.
+
+![Ship sheet with portrait, stats, and systems](docs/screenshots/ship-sheet.png)
 
 ### Ship sheet (`/ship/:token`)
 
@@ -51,11 +57,15 @@ Read-only play sheet for a saved ship (same browser registry for localStorage):
 - **Print** prompts whether to append crew actions after stats and description
 - **Share** (copy link) only when using a **database backend** on a **public host** (see below)
 
+![My Ships fleet dashboard](docs/screenshots/my-ships.png)
+
 ### My Ships
 
 - Edit, duplicate, delete saved builds
 - Pick a **game-icons.net emblem** per ship (4,000+ icons; collapses after selection)
 - Open the ship sheet view
+
+![Crew actions with roll buttons and crew portrait](docs/screenshots/crew-actions.png)
 
 ### Rules enforcement
 
