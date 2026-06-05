@@ -3,7 +3,7 @@ import { SYSTEMS_BY_ID } from '../data/systems';
 import { UPGRADES_BY_ID } from '../data/upgrades';
 import { WEAPONS_BY_NAME } from '../data/weapons';
 import { CREW_ROLES } from '../data/crewRoles';
-import { mapSizeFeet } from '../data/shipStats';
+import { shipDimensions } from '../data/shipStats';
 import { effectiveDmClass, slotsUsed } from './rules';
 
 // Builds the plain-text stat block used by "Copy to Clipboard".
@@ -25,7 +25,7 @@ export function shipToText(ship: Ship): string {
   lines.push(`  Speed: ${ship.speed.toLocaleString()} ft  •  Maneuverability: ${ship.maneuverability}°`);
   lines.push(`  Slots: ${used}/${ship.totalSlots}`);
   lines.push(`  Cargo: ${ship.cargo.toLocaleString()} tons  •  Passengers: ${ship.passengers}`);
-  lines.push(`  Map size: ${mapSizeFeet(ship.size)} ft`);
+  lines.push(`  Dimensions: ${shipDimensions(ship.size, ship.dimensionsOverride)}`);
 
   lines.push(THIN);
   lines.push('  SYSTEMS');

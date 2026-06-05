@@ -103,7 +103,7 @@ export const FIGHTER_CATALOG: FighterHullDef[] = [
     cost: 5000,
     trait:
       'Nimble Design. On any turn this ship does not fire its weapons, its speed increases by 1,000 ft. for that turn.',
-    defaultWeapons: [{ name: 'Pulse Cannon', facing: 'Forward' }],
+    defaultWeapons: [{ name: 'Pulse Beam', facing: 'Forward' }],
   },
   {
     id: 'landrunner',
@@ -175,7 +175,7 @@ export const FIGHTER_CATALOG: FighterHullDef[] = [
     maneuverability: 180,
     cost: 5000,
     trait: 'Innovative Design. The crew has advantage on initiative rolls.',
-    defaultWeapons: [{ name: 'Pulse Cannon', facing: 'Forward' }],
+    defaultWeapons: [{ name: 'Pulse Beam', facing: 'Forward' }],
   },
   {
     id: 'saucer',

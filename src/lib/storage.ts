@@ -51,6 +51,7 @@ export function emptyShip(): Ship {
     totalSlots: base.slots,
     cargo: base.cargo,
     passengers: base.passengers,
+    dimensionsOverride: null,
     crewRoles: [],
     crewMembers: {},
     systems: {},
@@ -125,6 +126,10 @@ export function recomputeShip(ship: Ship): Ship {
   return next;
 }
 
+function fixWeaponName(name: string): string {
+  return name === 'Pulse Cannon' ? 'Pulse Beam' : name;
+}
+
 /** Backfill fields added after initial release. */
 function normalizeShip(ship: Ship & { megaSpells?: string[] }): Ship {
   const crewMembers = { ...(ship.crewMembers ?? {}) };
@@ -163,9 +168,17 @@ function normalizeShip(ship: Ship & { megaSpells?: string[] }): Ship {
         type,
         catalogId: legacy.catalogId ?? (type === 'catalog' ? 'sabre' : null),
         customShipId: (legacy as FighterBaySlot & { customShipId?: string }).customShipId ?? null,
-        weapons: legacy.weapons ?? [],
+        weapons: (legacy.weapons ?? []).map((w) => ({
+          ...w,
+          name: fixWeaponName(w.name),
+        })),
       };
     }),
+    weapons: (rest.weapons ?? []).map((w) => ({
+      ...w,
+      name: fixWeaponName(w.name),
+    })),
+    dimensionsOverride: rest.dimensionsOverride ?? null,
     creditBudgetOverride: rest.creditBudgetOverride ?? null,
     mhpCurrent: rest.mhpCurrent ?? null,
     shieldCurrent: rest.shieldCurrent ?? null,

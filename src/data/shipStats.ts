@@ -79,6 +79,15 @@ export function mapSizeFeet(size: ShipSize): string {
   return MAP_SIZE_FEET[size];
 }
 
+/** Display dimensions for the ship sheet (override or size default). */
+export function shipDimensions(
+  size: ShipSize,
+  override: string | null | undefined,
+): string {
+  const trimmed = override?.trim();
+  return trimmed ? trimmed : mapSizeFeet(size);
+}
+
 /** Shield Points granted by a Shield Generator, by ship size (p.219). */
 export const SHIELD_POINTS_BY_SIZE: Record<ShipSize, number> = {
   Fighter: 4,

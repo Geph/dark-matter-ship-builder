@@ -3,11 +3,19 @@
 A fan-made web app for building starships under the **Dark Matter Sci-Fi 5E**
 ship-creation rules (Mage Hand Press, pp. 206–220). It walks your party through
 the official four-step flow, enforces Credits and slot limits automatically, and
-renders a finished stat block you can print, copy, or share.
+renders a finished stat block you can print or export.
 
 The UI is styled as a starship terminal: dark panels, cyan glow, scanlines, and
-a **top-down hull schematic** where weapons mount into facing arcs — inspired by
-tabletop fighter record sheets.
+a **top-down hull schematic** in the builder where weapons mount into facing
+arcs.
+
+**Live site:** https://geph.github.io/dark-matter-ship-builder/
+
+**Current release:** v0.1
+
+### Changelog
+
+- **v0.1** — Initial public release: full ship builder, fighter builds and bays, crew actions, game-icons emblems, ship sheet, GitHub Pages deploy, and versioned releases.
 
 ## What it does
 
@@ -15,43 +23,56 @@ tabletop fighter record sheets.
 
 | Step | Name | What you do |
 |------|------|-------------|
-| 1 | **Crew Manifest** | Set party level (1–20) and player count. Pick crew roles; each role auto-installs its system for free (Pilot → Pilot's Seat, Gunner → Gunner Bay, etc.). |
-| 2 | **Hull Scan** | Roll d100 or pick from the four official flavor tables: appearance, condition, interior, and unique trait. Override any result with custom text. |
-| 3 | **Loadout** | Spend Credits on systems, weapons, upgrades, and Dark Matter engine class upgrades. Live budget and slot bars warn when you're over limits. |
-| 4 | **Designation** | Name the ship, christen it into the registry, and review the final stat block. Export via print/PDF, plain-text copy, or share link. |
+| 1 | **Crew Manifest** | Set party level (1–20) and player count. Pick crew roles; each role auto-installs its system for free. Optional **custom fighter build** mode (pilot only, 6 slots). |
+| 2 | **Hull Scan** | Roll d100 or pick from four official flavor tables. Override any result with custom text. |
+| 3 | **Loadout** | Spend Credits on systems, weapons, upgrades, and DM engine class upgrades. Configure **fighter bays** (catalog or saved custom fighters). Auto-included systems show at the top with replacement cost. GM can override the credit budget (with permission warning). |
+| 4 | **Designation** | Name the ship, upload a **portrait** for the ship sheet, christen into the registry, and review the stat block. |
 
-### Ship configuration visual
+### Builder — Ship Configuration
 
-The **Ship Configuration** panel shows a top-down hull with five weapon-mount
-arcs:
+The builder’s **Ship Configuration** panel shows a top-down hull with five
+weapon-mount arcs:
 
 - **Fore** · **Port** · **Starboard** · **Aft** · **Turret**
 
-Select an arc, then mount a weapon from the Loadout tab — it appears on the
-diagram with an unmount control. A **hardpoint slot pip grid** fills as you
-install systems and weapons (upgrades cost 0 slots).
+Fighter bay configuration buttons sit below hardpoint slots. Fixed-mount weapons
+are restricted to appropriate arcs; fighter escape pods are never auto-installed
+on motherships.
+
+### Ship sheet (`/ship/:token`)
+
+Read-only play sheet for a saved ship (same browser registry for localStorage):
+
+- Full-width stat block (no hull schematic)
+- Editable **MHP**, **Shield**, and **Dimensions** (click to edit; dimensions default to rulebook map size)
+- Accordion sections: Systems, Weapons, Upgrades, Description
+- **Crew Actions** tabbed panel with rulebook actions and roll buttons
+- Optional ship portrait
+- **Print** prompts whether to append crew actions after stats and description
+- **Share** (copy link) only when using a **database backend** on a **public host** (see below)
+
+### My Ships
+
+- Edit, duplicate, delete saved builds
+- Pick a **game-icons.net emblem** per ship (4,000+ icons; collapses after selection)
+- Open the ship sheet view
 
 ### Rules enforcement
 
-The app enforces the rulebook automatically:
-
-- Credits budget: `(1,000 + 150 × (level − 1)) × players`
+- Credits budget: `(1,000 + 150 × (level − 1)) × players`, with optional GM override
 - Systems and weapons cost **1 slot** each; upgrades cost **0**
-- Size prerequisites (e.g. Fighter Bay requires Transport+)
-- Dark Matter class prerequisites (Dead Reckoner, Hypercapacitor, Panic Drive)
-- Repeat caps (Fighter Bay by size, Pilot's Seat ≤ 2, Teleporters ≤ 2 on Frigate+)
-- Every ship needs at least one **Pilot's Seat** or **Fighter Bay**
-- Crew-role and starting systems are **free** (Escape Pods, Life Support, Sensors, Shield Generator, plus role grants)
+- Size and DM class prerequisites, repeat caps, pilot seat / fighter bay requirements
+- Crew-role and starting systems are **free**
+- Full fighter catalog with default loadouts; custom fighter builds sync to fighter bays
 
 ### Persistence
 
-Ships save to your browser's **localStorage** — no account or server required.
-Use **My Ships** to edit, duplicate, delete, or open a read-only share view at
-`/ship/:shareToken`.
+Ships save to your browser’s **localStorage** by default — no account or server
+required.
 
-> Share links work on the same browser/device where the ship was saved. For
-> cross-device sharing, swap `src/lib/storage.ts` for a backend (Supabase steps
-> below).
+> **Share links** only appear when `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
+> are set (shared database) **and** the app is served on a public production URL
+> (not localhost). With localStorage alone, links are device-local.
 
 ## Routes
 
@@ -61,14 +82,16 @@ Use **My Ships** to edit, duplicate, delete, or open a read-only share view at
 | `/build` | New ship wizard |
 | `/build/:id` | Edit a saved ship |
 | `/ships` | My Ships dashboard |
-| `/ship/:token` | Read-only stat block + hull schematic |
+| `/ship/:token` | Ship sheet (stat block + crew actions) |
+
+On GitHub Pages the app is hosted under `/dark-matter-ship-builder/`.
 
 ## Quick start
 
 **Requirements:** Node.js 18+ and npm.
 
 ```bash
-git clone git@github.com:Geph/dark-matter-ship-builder.git
+git clone https://github.com/Geph/dark-matter-ship-builder.git
 cd dark-matter-ship-builder
 npm install
 npm run dev
@@ -79,49 +102,11 @@ Open **http://localhost:5173** and click **Build a Ship**.
 ### Production build
 
 ```bash
-npm run build    # type-check + output to dist/
-npm run preview  # serve the production build locally
+npm run build
+npm run preview
 ```
 
-## Project structure
-
-```
-src/
-  data/              # Rulebook tables (hardcoded for easy auditing)
-    shipStats.ts         # Stats by level, sizes, shield points by size
-    systems.ts           # Ship systems, costs, prerequisites
-    weapons.ts           # Ranged + melee weapons
-    upgrades.ts          # Upgrades + DM engine upgrade costs
-    crewRoles.ts         # Crew roles → granted systems
-    flavorTables.ts      # Four d100 description tables
-    shipNames.ts         # Random name generator
-  lib/
-    types.ts             # Domain types (Ship, WeaponFacing, etc.)
-    rules.ts             # All game logic — budget, slots, validation, mutators
-    storage.ts           # Persistence (localStorage; swap for backend here)
-    exportText.ts        # Plain-text stat block export
-  components/
-    ShipDiagram.tsx      # Visual hull + facing arcs + slot pips
-    StatBlock.tsx        # Formatted stat card
-    builder/             # Wizard steps, HUD, progress bar
-  pages/                 # Landing, Builder, MyShips, PublicShip
-```
-
-Game math lives in `src/lib/rules.ts`; all rulebook numbers live in
-`src/data/*`. Update tables there without touching UI code.
-
-## Deployment
-
-### GitHub Pages (primary)
-
-Live site: **https://geph.github.io/dark-matter-ship-builder/**
-
-Pushes to `main` deploy automatically via
-[`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml).
-In the repo **Settings → Pages**, set **Source** to **GitHub Actions** if it is
-not already.
-
-Local production build matching Pages:
+GitHub Pages build (correct asset base path):
 
 ```bash
 # Windows PowerShell
@@ -131,26 +116,44 @@ $env:GITHUB_PAGES='true'; npm run build
 GITHUB_PAGES=true npm run build
 ```
 
-### Other hosts
+## Project structure
 
-The app is a static SPA. Build and deploy `dist/` to **Vercel**, **Netlify**, or
-**Render Static**. For client-side routing, add a SPA fallback to `index.html`.
-On Vercel:
-
-```json
-{ "rewrites": [{ "source": "/(.*)", "destination": "/" }] }
 ```
+src/
+  data/              # Rulebook tables (fighters, weapons, crew actions, mega spells, …)
+  lib/
+    rules.ts         # Budget, slots, validation, fighter bay sync
+    storage.ts       # localStorage persistence (swap for Supabase)
+    sharing.ts       # When share links are enabled
+    useShipPrint.ts  # Print flow with optional crew actions
+  components/
+    ShipDiagram.tsx  # Builder hull schematic
+    StatBlock.tsx    # Stat card + accordions
+    CrewActionTabs.tsx / CrewActionsPrint.tsx
+  pages/             # Landing, Builder, MyShips, PublicShip
+public/game-icons/   # game-icons.net SVG pack + manifest
+```
+
+Game math lives in `src/lib/rules.ts`; rulebook numbers live in `src/data/*`.
+
+## Deployment
+
+Pushes to `main` deploy to **GitHub Pages** via
+[`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml).
+Each successful deploy bumps the patch-style version by **0.1** (footer shows
+`v0.1`, `v0.2`, …) and updates this README’s **Current release** line.
+
+In repo **Settings → Pages**, set **Source** to **GitHub Actions**.
 
 ## Optional: Supabase backend
 
-To persist ships across devices and enable real share links:
+To persist ships across devices and enable **Share** on a public deployment:
 
 1. Create a `ships` table matching `Ship` in `src/lib/types.ts`.
 2. `npm install @supabase/supabase-js`
 3. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `.env` (git-ignored).
-4. Reimplement `listShips`, `getShip`, `saveShip`, etc. in `src/lib/storage.ts`
-   against Supabase; make them `async` and await them in pages.
-5. Optionally add Supabase Auth and require login to save (building stays open).
+4. Reimplement storage in `src/lib/storage.ts` against Supabase.
+5. Deploy to a public URL (GitHub Pages, Vercel, Netlify, etc.).
 
 ## Tech stack
 
@@ -160,5 +163,7 @@ To persist ships across devices and enable real share links:
 
 ## Credits
 
-Game content © Mage Hand Press, *Dark Matter Sci-Fi 5E*. This is a fan-made
-tool and is not affiliated with or endorsed by the publisher.
+Game content © Mage Hand Press, *Dark Matter Sci-Fi 5E*. Ship and UI icons from
+[game-icons.net](https://game-icons.net/) (CC BY 3.0), including Delapouite’s
+spaceship. This is a fan-made tool and is not affiliated with or endorsed by the
+publisher.

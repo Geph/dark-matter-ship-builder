@@ -7,7 +7,7 @@ import { CREW_ROLES_BY_ID } from '../data/crewRoles';
 import { CREW_ACTIONS_BY_ROLE } from '../data/crewActions';
 import CrewActionPanel from './CrewActionPanel';
 import ShipIcon from './ShipIcon';
-import { mapSizeFeet } from '../data/shipStats';
+import { mapSizeFeet, shipDimensions } from '../data/shipStats';
 import { fighterDisplayName } from '../data/fighters';
 import {
   effectiveDmClass,
@@ -73,6 +73,8 @@ interface Props {
   ship: Ship;
   showCombat?: boolean;
   hideCrewActions?: boolean;
+  /** Keep crew actions on screen but omit from print (use CrewActionsPrint instead). */
+  crewActionsNoPrint?: boolean;
   showHeaderIcon?: boolean;
   /** When set, MHP and Shield current values are editable and persisted via this callback. */
   onUpdate?: (mutator: (s: Ship) => Ship) => void;
@@ -88,13 +90,16 @@ export default function StatBlock({
   ship,
   showCombat = false,
   hideCrewActions = false,
+  crewActionsNoPrint = false,
   showHeaderIcon = false,
   onUpdate,
 }: Props) {
+  const [editingDimensions, setEditingDimensions] = useState(false);
   const dm = effectiveDmClass(ship);
   const used = slotsUsed(ship);
   const systemEntries = Object.entries(ship.systems).filter(([, c]) => c > 0);
   const editable = !!onUpdate;
+  const dimensionsDisplay = shipDimensions(ship.size, ship.dimensionsOverride);
 
   const mhpMax = ship.mhp;
   const shieldMax = ship.shieldPoints;
@@ -113,6 +118,7 @@ export default function StatBlock({
     current: number,
     max: number,
     field: 'mhpCurrent' | 'shieldCurrent',
+    inputClass = 'w-[2.75rem]',
   ) => (
     <div className="flex flex-col min-w-0">
       <span className={`font-mono-hud ${STAT_LABEL}`}>{label}</span>
@@ -127,7 +133,7 @@ export default function StatBlock({
               const v = clampStatValue(e.target.value, max);
               onUpdate!((s) => ({ ...s, [field]: v }));
             }}
-            className="w-[2.75rem] min-w-0 bg-void/80 border border-cyan/40 rounded-sm px-1 py-0 font-display text-[1.0125rem] text-cyan glow-text text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            className={`${inputClass} min-w-0 bg-void/80 border border-cyan/40 rounded-sm px-1 py-0 font-display text-[1.0125rem] text-cyan glow-text text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
             aria-label={`${label} current`}
           />
           <span className="text-slate-500 font-mono-hud text-[0.9rem]">/</span>
@@ -137,6 +143,43 @@ export default function StatBlock({
         <span className={STAT_VALUE_CYAN}>
           {current} / {max}
         </span>
+      )}
+    </div>
+  );
+
+  const dimensionsStat = () => (
+    <div className="flex flex-col min-w-0">
+      <span className={`font-mono-hud ${STAT_LABEL}`}>DIMENSIONS</span>
+      {editable && editingDimensions ? (
+        <input
+          type="text"
+          value={ship.dimensionsOverride ?? mapSizeFeet(ship.size)}
+          onChange={(e) => {
+            const next = e.target.value;
+            onUpdate!((s) => ({
+              ...s,
+              dimensionsOverride:
+                next.trim() === '' || next === mapSizeFeet(s.size) ? null : next,
+            }));
+          }}
+          onBlur={() => setEditingDimensions(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') setEditingDimensions(false);
+          }}
+          autoFocus
+          className="w-full min-w-0 bg-void/80 border border-cyan/40 rounded-sm px-1 py-0 font-display text-[0.85rem] sm:text-[1.0125rem] text-cyan glow-text [appearance:textfield]"
+          aria-label="Dimensions"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => editable && setEditingDimensions(true)}
+          className={`${STAT_VALUE_CYAN} text-left break-words ${editable ? 'cursor-pointer hover:text-cyan/80' : 'cursor-default'}`}
+          disabled={!editable}
+          title={editable ? 'Click to edit dimensions' : undefined}
+        >
+          {dimensionsDisplay}
+        </button>
       )}
     </div>
   );
@@ -195,17 +238,17 @@ export default function StatBlock({
 
       <div className="grid grid-cols-5 gap-2 sm:gap-3 mb-2">
         {stat('CLASS', ship.size, true)}
-        {fractionStat('MHP', mhpNow, mhpMax, 'mhpCurrent')}
+        {fractionStat('MHP', mhpNow, mhpMax, 'mhpCurrent', 'w-[4.25rem]')}
         {stat('AC', ship.ac)}
         {fractionStat('SHIELD', shieldNow, shieldMax, 'shieldCurrent')}
-        {stat('PASS.', ship.passengers)}
+        {stat('PASSENGERS', ship.passengers)}
       </div>
       <div className="grid grid-cols-5 gap-2 sm:gap-3 mb-2">
         {stat('SLOTS', `${used}/${ship.totalSlots}`)}
         {stat('SPEED', `${ship.speed.toLocaleString()} ft`)}
         {stat('MANU.', `${ship.maneuverability}°`)}
         {stat('CARGO', `${ship.cargo.toLocaleString()} t`)}
-        {stat('MAP SIZE', `${mapSizeFeet(ship.size)} ft`)}
+        {dimensionsStat()}
       </div>
 
       <AccordionSection label="SYSTEMS">
@@ -283,7 +326,7 @@ export default function StatBlock({
       </AccordionSection>
 
       {!hideCrewActions && (
-        <>
+        <div className={crewActionsNoPrint ? 'no-print' : undefined}>
           <Divider label={showCombat ? 'CREW ACTIONS' : 'CREW'} />
           {ship.crewRoles.length === 0 ? (
             <p className="text-slate-500 text-sm">No crew roles assigned.</p>
@@ -359,7 +402,7 @@ export default function StatBlock({
               })}
             </ul>
           )}
-        </>
+        </div>
       )}
 
       <AccordionSection label="DESCRIPTION">

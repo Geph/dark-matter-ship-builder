@@ -2,7 +2,11 @@ import { useState } from 'react';
 import type { Ship } from '../../lib/types';
 import { randomShipName } from '../../data/shipNames';
 import { shipToText } from '../../lib/exportText';
+import { shipShareUrl } from '../../lib/shareUrl';
+import { canShareShipLinks } from '../../lib/sharing';
+import { useShipPrint } from '../../lib/useShipPrint';
 import StatBlock from '../StatBlock';
+import CrewActionsPrint from '../CrewActionsPrint';
 import ShipImageUpload from '../ShipImageUpload';
 
 interface Props {
@@ -15,6 +19,8 @@ interface Props {
 export default function StepName({ ship, update, onSave, savedAt }: Props) {
   const [christened, setChristened] = useState(false);
   const [copied, setCopied] = useState(false);
+  const { printWithCrewActions, requestPrint } = useShipPrint();
+  const showShare = canShareShipLinks();
 
   const christen = () => {
     if (!ship.name.trim()) return;
@@ -33,7 +39,7 @@ export default function StepName({ ship, update, onSave, savedAt }: Props) {
     }
   };
 
-  const shareUrl = `${window.location.origin}/ship/${ship.shareToken}`;
+  const shareUrl = shipShareUrl(ship.shareToken);
 
   return (
     <div className="space-y-6">
@@ -79,34 +85,43 @@ export default function StepName({ ship, update, onSave, savedAt }: Props) {
         </button>
         {savedAt && (
           <p className="font-mono-hud text-[11px] text-ok text-center">
-            Saved to registry at {savedAt}. Share link:{' '}
-            <span className="text-cyan break-all">{shareUrl}</span>
+            Saved to registry at {savedAt}.
+            {showShare && (
+              <>
+                {' '}
+                Share link:{' '}
+                <span className="text-cyan break-all">{shareUrl}</span>
+              </>
+            )}
           </p>
         )}
       </div>
 
       {/* Export controls */}
       <div className="no-print flex flex-wrap gap-2">
-        <button type="button" className="btn" onClick={() => window.print()}>
+        <button type="button" className="btn" onClick={requestPrint}>
           ⎙ Print / PDF
         </button>
         <button type="button" className="btn" onClick={copy}>
           {copied ? '✓ Copied' : '⧉ Copy as Text'}
         </button>
-        <button
-          type="button"
-          className="btn"
-          onClick={() => {
-            navigator.clipboard?.writeText(shareUrl);
-            setCopied(false);
-          }}
-        >
-          🔗 Copy Share Link
-        </button>
+        {showShare && (
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              navigator.clipboard?.writeText(shareUrl);
+              setCopied(false);
+            }}
+          >
+            🔗 Share
+          </button>
+        )}
       </div>
 
       {/* Final stat card preview */}
-      <StatBlock ship={ship} showCombat />
+      <StatBlock ship={ship} showCombat crewActionsNoPrint />
+      {printWithCrewActions && <CrewActionsPrint ship={ship} />}
     </div>
   );
 }

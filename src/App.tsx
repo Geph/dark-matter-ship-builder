@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom';
 import Header from './components/Header';
+import { appVersionLabel } from './lib/version';
 import Landing from './pages/Landing';
 import Builder from './pages/Builder';
 import MyShips from './pages/MyShips';
@@ -41,6 +42,7 @@ export default function App() {
             game-icons.net
           </a>
         </p>
+        <p className="text-slate-700">{appVersionLabel()}</p>
       </footer>
     </div>
   );

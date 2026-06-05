@@ -72,6 +72,8 @@ export interface Ship {
   totalSlots: number;
   cargo: number;
   passengers: number;
+  /** Tactical map dimensions override; null uses the default for ship size. */
+  dimensionsOverride: string | null;
   crewRoles: string[];
   /** Per-role skill and combat data keyed by crew role id. */
   crewMembers: Record<string, CrewMemberData>;

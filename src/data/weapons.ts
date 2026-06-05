@@ -18,7 +18,6 @@ export interface WeaponDef {
 
 export const RANGED_WEAPONS: WeaponDef[] = [
   { id: 'light-cannon', name: 'Light Cannon', damage: '2d8 Mega Piercing', category: 'Ranged', type: 'Simple', properties: 'Ammo (4k/12k; Shell), Firearm, Fixed, Kinetic, Mega', description: 'Light fixed-mount kinetic cannon for forward-arc engagements.', mastery: 'Push', cost: 500 },
-  { id: 'pulse-cannon', name: 'Pulse Cannon', damage: '3d8 Mega Radiant', category: 'Ranged', type: 'Martial', properties: 'Blaster (6k/18k), Firearm, Fixed, Mega', description: 'Standard Hegemony and elven fighter pulse cannon — fixed forward mount.', mastery: 'Vex', cost: 0 },
   { id: 'mining-laser', name: 'Mining Laser', damage: '2d6 Mega Radiant', category: 'Ranged', type: 'Simple', properties: 'Blaster (2k/6k), Firearm, Mega', description: 'Turret-mounted mining laser adapted for combat use.', mastery: 'Slow', cost: 400 },
   { id: 'phase-beam', name: 'Phase Beam', damage: '2d8 Mega Radiant', category: 'Ranged', type: 'Simple', properties: 'Blaster (4k/12k), Firearm, Fixed, Mega', description: 'Fixed radiant beam weapon that phases through light armor.', mastery: 'Vex', cost: 600 },
   { id: 'scorcher', name: 'Scorcher', damage: '2d6 Mega Fire', category: 'Ranged', type: 'Simple', properties: 'Blaster (2k/6k), Firearm, Mega', description: 'Turret flamethrower-style blaster for close-range suppression.', mastery: 'Bypass', cost: 750 },
