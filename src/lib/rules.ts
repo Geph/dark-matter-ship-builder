@@ -1,8 +1,15 @@
-import type { Ship, ShipSize, ShipWeapon, WeaponFacing } from './types';
-import { SYSTEMS_BY_ID, type SystemDef } from '../data/systems';
+import type { FighterBaySlot, FighterType, Ship, ShipSize, ShipWeapon, WeaponFacing } from './types';
+import { fighterHullById, resolveFighterBayHull } from '../data/fighters';
+import { SYSTEMS_BY_ID, HULL_EMBEDDED_SYSTEM_IDS, type SystemDef } from '../data/systems';
 import { UPGRADES_BY_ID, DM_ENGINE_COSTS, type UpgradeDef } from '../data/upgrades';
-import { WEAPONS_BY_NAME } from '../data/weapons';
+import { WEAPONS_BY_NAME, type WeaponDef } from '../data/weapons';
 import { CREW_ROLES_BY_ID, STARTING_SYSTEM_IDS } from '../data/crewRoles';
+
+/** Starting systems granted free on a standard hull vs. a fighter build. */
+export function startingSystemIds(ship: Ship): string[] {
+  if (ship.isFighterBuild) return ['life-support', 'sensors'];
+  return STARTING_SYSTEM_IDS;
+}
 import {
   SHIELD_POINTS_BY_SIZE,
   sizeRank,
@@ -24,6 +31,35 @@ export function budgetForLevel(level: number, players: number): number {
   return perPlayer * Math.max(1, players);
 }
 
+/** Credit budget in effect — manual GM override or level-derived default. */
+export function effectiveBudget(ship: Ship): number {
+  if (ship.creditBudgetOverride != null && ship.creditBudgetOverride >= 0) {
+    return ship.creditBudgetOverride;
+  }
+  return budgetForLevel(ship.level, ship.players);
+}
+
+export function fighterBayCount(ship: Ship): number {
+  return ship.systems['fighter-bay'] ?? 0;
+}
+
+/** Keep fighter bay slots aligned with installed Fighter Bay count. */
+export function syncFighterBays(ship: Ship): FighterBaySlot[] {
+  const count = fighterBayCount(ship);
+  const existing = ship.fighterBays ?? [];
+  const bays: FighterBaySlot[] = [];
+  for (let i = 0; i < count; i++) {
+    bays.push(
+      existing[i] ?? { type: 'none', catalogId: null, customShipId: null, weapons: [] },
+    );
+  }
+  return bays;
+}
+
+export function fighterBayDeployCost(bay: FighterBaySlot): number {
+  return resolveFighterBayHull(bay)?.cost ?? 0;
+}
+
 /**
  * Systems that are granted FOR FREE: the four starting systems
  * plus one system per chosen crew role (Dark Matter 5E, p.215, p.218).
@@ -32,7 +68,7 @@ export function budgetForLevel(level: number, players: number): number {
  */
 export function grantedSystemCounts(ship: Ship): Record<string, number> {
   const granted: Record<string, number> = {};
-  for (const id of STARTING_SYSTEM_IDS) {
+  for (const id of startingSystemIds(ship)) {
     granted[id] = (granted[id] ?? 0) + 1;
   }
   for (const roleId of ship.crewRoles) {
@@ -47,10 +83,14 @@ export function grantedSystemCounts(ship: Ship): Record<string, number> {
  * the granted number of times. Returns a new systems map. Used after
  * crew roles change so auto-added systems appear in the loadout.
  */
+/** Systems that must be manually installed — never auto-granted. */
+export const NEVER_AUTO_INSTALL_IDS = ['escape-pod-fighter'];
+
 export function withGrantedSystems(ship: Ship): Record<string, number> {
   const granted = grantedSystemCounts(ship);
   const systems = { ...ship.systems };
   for (const [id, count] of Object.entries(granted)) {
+    if (NEVER_AUTO_INSTALL_IDS.includes(id)) continue;
     systems[id] = Math.max(systems[id] ?? 0, count);
   }
   return systems;
@@ -58,6 +98,7 @@ export function withGrantedSystems(ship: Ship): Record<string, number> {
 
 /** The Dark Matter engine class actually in effect (base, or upgraded). */
 export function effectiveDmClass(ship: Ship): number {
+  if (ship.isFighterBuild) return 0;
   const base = statsForLevel(ship.level).dmClass;
   return ship.upgradedDmClass != null ? Math.max(base, ship.upgradedDmClass) : base;
 }
@@ -88,7 +129,13 @@ export function computeCreditsSpent(ship: Ship): number {
     if (def) total += def.cost;
   }
 
-  total += dmEngineUpgradeCost(ship);
+  if (!ship.isFighterBuild) {
+    total += dmEngineUpgradeCost(ship);
+  }
+
+  for (const bay of syncFighterBays(ship)) {
+    total += fighterBayDeployCost(bay);
+  }
 
   return total;
 }
@@ -99,6 +146,7 @@ export function computeCreditsSpent(ship: Ship): number {
  * is purchased in turn per the Dark Matter Engine Upgrade table.
  */
 export function dmEngineUpgradeCost(ship: Ship): number {
+  if (ship.isFighterBuild) return 0;
   const base = statsForLevel(ship.level).dmClass;
   if (ship.upgradedDmClass == null || ship.upgradedDmClass <= base) return 0;
   let cost = 0;
@@ -172,14 +220,14 @@ export function canInstallUpgrade(ship: Ship, def: UpgradeDef): PrereqResult {
  */
 export function validateShip(ship: Ship): string[] {
   const errors: string[] = [];
-  const budget = budgetForLevel(ship.level, ship.players);
+  const budget = effectiveBudget(ship);
   const spent = computeCreditsSpent(ship);
   const used = slotsUsed(ship);
 
   // Rule 1: at least one Pilot's Seat or Fighter Bay.
   const pilots = ship.systems['pilots-seat'] ?? 0;
-  const bays = ship.systems['fighter-bay'] ?? 0;
-  if (pilots + bays < 1) {
+  const fighterBaysInstalled = ship.systems['fighter-bay'] ?? 0;
+  if (pilots + fighterBaysInstalled < 1) {
     errors.push("Every ship needs at least one Pilot's Seat or Fighter Bay.");
   }
 
@@ -219,7 +267,72 @@ export function validateShip(ship: Ship): string[] {
     errors.push(`Over budget: ${spent.toLocaleString()} / ${budget.toLocaleString()} CR.`);
   }
 
+  // Weapon mount rules: Fixed → arc facings only; non-Fixed → turret only.
+  for (const w of ship.weapons) {
+    const def = WEAPONS_BY_NAME[w.name];
+    if (!def) continue;
+    const mount = canMountWeapon(def, w.facing);
+    if (!mount.ok) {
+      errors.push(`${def.name} [${w.facing}]: ${mount.reason}`);
+    }
+  }
+
+  const fighterSlots = syncFighterBays(ship);
+  fighterSlots.forEach((bay, i) => {
+    if (bay.type === 'none') return;
+    for (const w of bay.weapons) {
+      const def = WEAPONS_BY_NAME[w.name];
+      if (!def) continue;
+      const mount = canMountWeapon(def, w.facing);
+      if (!mount.ok) {
+        errors.push(`Fighter ${i + 1} — ${def.name} [${w.facing}]: ${mount.reason}`);
+      }
+    }
+  });
+
   return errors;
+}
+
+/** Arc facings for Fixed weapons (not the turret). */
+export const ARC_FACINGS: WeaponFacing[] = ['Forward', 'Port', 'Starboard', 'Aft'];
+
+export function weaponHasFixed(def: WeaponDef): boolean {
+  return def.properties.split(',').some((p) => p.trim().toLowerCase() === 'fixed');
+}
+
+/** Resolve the facing used when mounting a weapon. */
+export function resolveMountFacing(def: WeaponDef, selectedFacing: WeaponFacing): WeaponFacing {
+  return weaponHasFixed(def) ? selectedFacing : 'Turret';
+}
+
+/** Can this weapon be mounted on the given facing? */
+export function canMountWeapon(def: WeaponDef, facing: WeaponFacing): PrereqResult {
+  if (weaponHasFixed(def)) {
+    if (facing === 'Turret') {
+      return { ok: false, reason: 'Fixed weapons must mount on Fore, Port, Starboard, or Aft.' };
+    }
+    if (!ARC_FACINGS.includes(facing)) {
+      return { ok: false, reason: 'Invalid arc facing.' };
+    }
+    return { ok: true };
+  }
+  if (facing !== 'Turret') {
+    return { ok: false, reason: 'Non-fixed weapons automatically mount on the Turret.' };
+  }
+  return { ok: true };
+}
+
+/** Whether a system instance is hull-embedded (not a weapon mount). */
+export function isHullEmbeddedSystem(systemId: string): boolean {
+  return HULL_EMBEDDED_SYSTEM_IDS.includes(systemId);
+}
+
+/** Attack bonus from the Gunner crew member, or a level-derived default. */
+export function gunnerAttackBonus(ship: Ship): number {
+  const gunner = ship.crewMembers?.['gunner'];
+  if (gunner && gunner.attackBonus !== 0) return gunner.attackBonus;
+  if (gunner?.skillModifier) return gunner.skillModifier + 2;
+  return Math.max(2, Math.floor(ship.level / 4) + 2);
 }
 
 /** Slots still available on the ship. May be negative if over capacity. */
@@ -257,18 +370,142 @@ export function removeSystem(ship: Ship, systemId: string): Ship {
   return { ...ship, systems };
 }
 
-/** Mount a weapon with a facing. */
+/** Mount a weapon. Non-fixed weapons always go on the Turret. */
 export function addWeapon(
   ship: Ship,
   name: string,
   facing: WeaponFacing = 'Forward',
 ): Ship {
-  return { ...ship, weapons: [...ship.weapons, { name, facing }] };
+  const def = WEAPONS_BY_NAME[name];
+  if (!def) return { ...ship, weapons: [...ship.weapons, { name, facing }] };
+  const resolved = resolveMountFacing(def, facing);
+  const check = canMountWeapon(def, resolved);
+  if (!check.ok) return ship;
+  return { ...ship, weapons: [...ship.weapons, { name, facing: resolved }] };
 }
 
 /** Remove the weapon at a given index. */
 export function removeWeaponAt(ship: Ship, index: number): Ship {
   return { ...ship, weapons: ship.weapons.filter((_, i) => i !== index) };
+}
+
+/** Set the fighter type for a bay and load book-default weapons. */
+export function setFighterBayType(ship: Ship, bayIndex: number, type: FighterType): Ship {
+  const bays = syncFighterBays(ship).map((bay, i) => {
+    if (i !== bayIndex) return bay;
+    const hull =
+      type === 'catalog'
+        ? null
+        : resolveFighterBayHull({ type, catalogId: null, customShipId: null, weapons: [] });
+    return {
+      type,
+      catalogId: type === 'catalog' ? (bay.catalogId ?? 'sabre') : null,
+      customShipId: null,
+      weapons: hull ? [...hull.defaultWeapons] : [],
+    };
+  });
+  return { ...ship, fighterBays: bays };
+}
+
+export function setFighterBayCatalogId(
+  ship: Ship,
+  bayIndex: number,
+  catalogId: string,
+): Ship {
+  const bays = syncFighterBays(ship).map((bay, i) => {
+    if (i !== bayIndex) return bay;
+    const hull = fighterHullById(catalogId);
+    return {
+      type: 'catalog' as FighterType,
+      catalogId,
+      customShipId: null,
+      weapons: hull ? [...hull.defaultWeapons] : bay.weapons,
+    };
+  });
+  return { ...ship, fighterBays: bays };
+}
+
+/** Populate a fighter bay from a user-saved fighter build. */
+export function setFighterBayFromCustomShip(
+  ship: Ship,
+  bayIndex: number,
+  customShip: Ship,
+): Ship {
+  const hullId = customShip.fighterHullId;
+  const bays = syncFighterBays(ship).map((bay, i) => {
+    if (i !== bayIndex) return bay;
+    return {
+      ...bay,
+      type: 'catalog' as FighterType,
+      catalogId: hullId ?? bay.catalogId,
+      customShipId: customShip.id,
+      weapons: [...customShip.weapons],
+    };
+  });
+  return { ...ship, fighterBays: bays };
+}
+
+/** Set the catalog hull template for a standalone fighter build. */
+export function setFighterBuildHull(ship: Ship, hullId: string): Ship {
+  const hull = fighterHullById(hullId);
+  return {
+    ...ship,
+    fighterHullId: hullId,
+    weapons: hull ? [...hull.defaultWeapons] : ship.weapons,
+  };
+}
+
+/** Mount a weapon on a deployed fighter. */
+export function addFighterWeapon(
+  ship: Ship,
+  bayIndex: number,
+  name: string,
+  facing: WeaponFacing = 'Forward',
+): Ship {
+  const def = WEAPONS_BY_NAME[name];
+  const bays = syncFighterBays(ship);
+  const bay = bays[bayIndex];
+  if (!bay || bay.type === 'none') return ship;
+
+  const resolved = def ? resolveMountFacing(def, facing) : facing;
+  if (def) {
+    const check = canMountWeapon(def, resolved);
+    if (!check.ok) return ship;
+  }
+
+  bays[bayIndex] = {
+    ...bay,
+    weapons: [...bay.weapons, { name, facing: resolved }],
+  };
+  return { ...ship, fighterBays: bays };
+}
+
+export function removeFighterWeaponAt(ship: Ship, bayIndex: number, index: number): Ship {
+  const bays = syncFighterBays(ship);
+  const bay = bays[bayIndex];
+  if (!bay) return ship;
+  bays[bayIndex] = {
+    ...bay,
+    weapons: bay.weapons.filter((_, i) => i !== index),
+  };
+  return { ...ship, fighterBays: bays };
+}
+
+/** Group fighter weapons by facing (for configuration diagram). */
+export function fighterWeaponsByFacing(
+  weapons: ShipWeapon[],
+): Record<WeaponFacing, { weapon: ShipWeapon; index: number }[]> {
+  const out: Record<WeaponFacing, { weapon: ShipWeapon; index: number }[]> = {
+    Forward: [],
+    Port: [],
+    Starboard: [],
+    Aft: [],
+    Turret: [],
+  };
+  weapons.forEach((weapon, index) => {
+    out[weapon.facing].push({ weapon, index });
+  });
+  return out;
 }
 
 /** Change the firing facing of the weapon at a given index. */

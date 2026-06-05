@@ -1,6 +1,7 @@
-import type { Ship } from './types';
+import type { FighterBaySlot, Ship } from './types';
 import { statsForLevel } from '../data/shipStats';
-import { computeCreditsSpent, computeShieldPoints } from './rules';
+import { fighterHullById, FIGHTER_SLOT_COUNT } from '../data/fighters';
+import { computeCreditsSpent, computeShieldPoints, syncFighterBays } from './rules';
 
 // ============================================================
 // Persistence layer. Currently backed by the browser's
@@ -32,21 +33,30 @@ export function emptyShip(): Ship {
     id: uuid(),
     userId: null,
     name: '',
+    iconId: null,
+    shipImageDataUrl: null,
     level: 1,
     players: 1,
+    isFighterBuild: false,
+    fighterHullId: null,
     size: base.size,
     darkMatterClass: base.dmClass,
     mhp: base.mhp,
+    mhpCurrent: null,
     ac: base.ac,
     shieldPoints: 0,
+    shieldCurrent: null,
     speed: base.speed,
     maneuverability: base.maneuverability,
     totalSlots: base.slots,
     cargo: base.cargo,
     passengers: base.passengers,
     crewRoles: [],
+    crewMembers: {},
     systems: {},
     weapons: [],
+    fighterBays: [],
+    creditBudgetOverride: null,
     upgrades: [],
     upgradedDmClass: null,
     appearance: '',
@@ -66,21 +76,102 @@ export function emptyShip(): Ship {
  */
 export function recomputeShip(ship: Ship): Ship {
   const base = statsForLevel(ship.level);
-  const next: Ship = {
-    ...ship,
-    size: base.size,
-    darkMatterClass: base.dmClass,
-    mhp: base.mhp,
-    ac: base.ac,
-    speed: base.speed,
-    maneuverability: base.maneuverability,
-    totalSlots: base.slots,
-    cargo: base.cargo,
-    passengers: base.passengers,
-  };
+  let next: Ship = { ...ship };
+
+  if (ship.isFighterBuild) {
+    const hull = fighterHullById(ship.fighterHullId ?? 'sabre');
+    next = {
+      ...next,
+      players: 1,
+      size: 'Fighter',
+      darkMatterClass: 0,
+      mhp: hull?.mhp ?? 25,
+      ac: hull?.ac ?? 13,
+      speed: hull?.speed ?? 3500,
+      maneuverability: hull?.maneuverability ?? 180,
+      totalSlots: FIGHTER_SLOT_COUNT,
+      cargo: 0,
+      passengers: 1,
+      upgradedDmClass: null,
+      fighterHullId: ship.fighterHullId ?? 'sabre',
+    };
+    if (!next.crewRoles.includes('pilot')) {
+      next.crewRoles = ['pilot'];
+    }
+    next.crewRoles = next.crewRoles.filter((r) => r === 'pilot');
+  } else {
+    next = {
+      ...next,
+      size: base.size,
+      darkMatterClass: base.dmClass,
+      mhp: base.mhp,
+      ac: base.ac,
+      speed: base.speed,
+      maneuverability: base.maneuverability,
+      totalSlots: base.slots,
+      cargo: base.cargo,
+      passengers: base.passengers,
+    };
+  }
+  next.fighterBays = syncFighterBays(next);
   next.shieldPoints = computeShieldPoints(next);
+  if (next.mhpCurrent != null) {
+    next.mhpCurrent = Math.min(Math.max(0, next.mhpCurrent), next.mhp);
+  }
+  if (next.shieldCurrent != null) {
+    next.shieldCurrent = Math.min(Math.max(0, next.shieldCurrent), next.shieldPoints);
+  }
   next.creditsSpent = computeCreditsSpent(next);
   return next;
+}
+
+/** Backfill fields added after initial release. */
+function normalizeShip(ship: Ship & { megaSpells?: string[] }): Ship {
+  const crewMembers = { ...(ship.crewMembers ?? {}) };
+  const legacyMega = ship.megaSpells ?? [];
+  if (legacyMega.length > 0) {
+    const gunner = crewMembers.gunner ?? {
+      name: '',
+      skillModifier: 0,
+      attackBonus: 0,
+      megaSpells: [],
+    };
+    if (!gunner.megaSpells?.length) {
+      crewMembers.gunner = { ...gunner, megaSpells: legacyMega };
+    }
+  }
+  for (const [roleId, member] of Object.entries(crewMembers)) {
+    crewMembers[roleId] = {
+      name: member.name ?? '',
+      skillModifier: member.skillModifier ?? 0,
+      attackBonus: member.attackBonus ?? 0,
+      megaSpells: member.megaSpells ?? [],
+    };
+  }
+  const { megaSpells: _legacy, ...rest } = ship;
+  return {
+    ...rest,
+    crewMembers,
+    iconId: rest.iconId ?? null,
+    shipImageDataUrl: rest.shipImageDataUrl ?? null,
+    fighterBays: (rest.fighterBays ?? []).map((bay) => {
+      const legacy = bay as FighterBaySlot & { customName?: string; type?: string };
+      const rawType = String(legacy.type ?? 'none');
+      const type: FighterBaySlot['type'] =
+        rawType === 'custom' ? 'catalog' : (rawType as FighterBaySlot['type']);
+      return {
+        type,
+        catalogId: legacy.catalogId ?? (type === 'catalog' ? 'sabre' : null),
+        customShipId: (legacy as FighterBaySlot & { customShipId?: string }).customShipId ?? null,
+        weapons: legacy.weapons ?? [],
+      };
+    }),
+    creditBudgetOverride: rest.creditBudgetOverride ?? null,
+    mhpCurrent: rest.mhpCurrent ?? null,
+    shieldCurrent: rest.shieldCurrent ?? null,
+    isFighterBuild: rest.isFighterBuild ?? false,
+    fighterHullId: rest.fighterHullId ?? null,
+  };
 }
 
 function readAll(): Ship[] {
@@ -88,7 +179,7 @@ function readAll(): Ship[] {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as Ship[];
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed) ? parsed.map(normalizeShip) : [];
   } catch {
     return [];
   }

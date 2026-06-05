@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "icons:manifest": "node scripts/generate-game-icons-manifest.mjs",
+    "build": "npm run icons:manifest && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },

@@ -1,24 +1,34 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { Ship } from '../lib/types';
-import { listShips, deleteShip, duplicateShip } from '../lib/storage';
+import { listShips, deleteShip, duplicateShip, saveShip } from '../lib/storage';
 import { effectiveDmClass } from '../lib/rules';
+import ShipIcon from '../components/ShipIcon';
+import ShipIconPicker from '../components/ShipIconPicker';
 
 export default function MyShips() {
   const navigate = useNavigate();
   const [ships, setShips] = useState<Ship[]>(() => listShips());
+  const [emblemEditId, setEmblemEditId] = useState<string | null>(null);
 
   const refresh = () => setShips(listShips());
 
   const remove = (id: string, name: string) => {
     if (confirm(`Decommission "${name || 'Untitled'}"? This cannot be undone.`)) {
       deleteShip(id);
+      if (emblemEditId === id) setEmblemEditId(null);
       refresh();
     }
   };
 
   const duplicate = (id: string) => {
     duplicateShip(id);
+    refresh();
+  };
+
+  const setEmblem = (ship: Ship, iconId: string | null) => {
+    saveShip({ ...ship, iconId });
+    setEmblemEditId(null);
     refresh();
   };
 
@@ -44,8 +54,26 @@ export default function MyShips() {
         <div className="grid sm:grid-cols-2 gap-4">
           {ships.map((ship) => (
             <div key={ship.id} className="panel panel-corner p-4 flex flex-col">
-              <div className="flex items-start justify-between">
-                <div className="min-w-0">
+              <div className="flex items-start justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setEmblemEditId((id) => (id === ship.id ? null : ship.id))
+                  }
+                  className={`shrink-0 rounded-sm border p-1 transition-all hover:border-cyan/60 ${
+                    emblemEditId === ship.id ? 'border-cyan bg-cyan/10' : 'border-slate-700'
+                  }`}
+                  title="Choose registry emblem"
+                >
+                  {ship.iconId ? (
+                    <ShipIcon iconId={ship.iconId} className="w-10 h-10" alt="" />
+                  ) : (
+                    <span className="w-10 h-10 flex items-center justify-center font-mono-hud text-[9px] text-slate-500">
+                      + emblem
+                    </span>
+                  )}
+                </button>
+                <div className="min-w-0 flex-1">
                   <Link
                     to={`/build/${ship.id}`}
                     className="font-display text-lg text-cyan glow-text hover:underline break-words"
@@ -60,6 +88,15 @@ export default function MyShips() {
                   {ship.totalSlots} slots
                 </span>
               </div>
+
+              {emblemEditId === ship.id && (
+                <div className="mt-3 pt-3 border-t border-slate-700/60">
+                  <ShipIconPicker
+                    value={ship.iconId}
+                    onChange={(iconId) => setEmblem(ship, iconId)}
+                  />
+                </div>
+              )}
 
               <p className="font-mono-hud text-[10px] text-slate-500 mt-2">
                 Edited {new Date(ship.updatedAt).toLocaleString()}

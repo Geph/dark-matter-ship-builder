@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
+import SpaceshipIcon from './SpaceshipIcon';
 
 export default function Header() {
   const { pathname } = useLocation();
@@ -21,8 +22,8 @@ export default function Header() {
     <header className="no-print sticky top-0 z-50 border-b border-cyan/25 backdrop-blur-sm bg-[#0a0c14]/80">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-3 group">
-          <div className="w-8 h-8 rounded-full border border-cyan flex items-center justify-center group-hover:shadow-[0_0_14px_#00e5ff] transition-shadow">
-            <div className="w-3 h-3 rounded-full bg-cyan glow-text" />
+          <div className="w-9 h-9 rounded-full border border-cyan flex items-center justify-center text-cyan group-hover:shadow-[0_0_14px_#00e5ff] transition-shadow">
+            <SpaceshipIcon className="w-5 h-5" />
           </div>
           <div className="leading-tight">
             <div className="font-display text-cyan text-sm tracking-[0.2em] glow-text">

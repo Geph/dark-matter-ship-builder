@@ -64,6 +64,21 @@ export function sizeRank(size: ShipSize): number {
   return SIZE_ORDER.indexOf(size);
 }
 
+/** Tactical map footprint by ship classification (p.134, feet). */
+export const MAP_SIZE_FEET: Record<ShipSize, string> = {
+  Fighter: '<100',
+  Personal: '250 × 250',
+  Transport: '500 × 500',
+  Corvette: '1,000 × 1,000',
+  Frigate: '1,500 × 1,500',
+  Cruiser: '2,000 × 2,000',
+  Capital: '4,000 × 4,000',
+};
+
+export function mapSizeFeet(size: ShipSize): string {
+  return MAP_SIZE_FEET[size];
+}
+
 /** Shield Points granted by a Shield Generator, by ship size (p.219). */
 export const SHIELD_POINTS_BY_SIZE: Record<ShipSize, number> = {
   Fighter: 4,

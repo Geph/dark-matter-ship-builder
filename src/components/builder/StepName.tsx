@@ -3,6 +3,7 @@ import type { Ship } from '../../lib/types';
 import { randomShipName } from '../../data/shipNames';
 import { shipToText } from '../../lib/exportText';
 import StatBlock from '../StatBlock';
+import ShipImageUpload from '../ShipImageUpload';
 
 interface Props {
   ship: Ship;
@@ -41,7 +42,7 @@ export default function StepName({ ship, update, onSave, savedAt }: Props) {
           STEP 4 · DESIGNATION
         </h2>
         <p className="text-slate-400 text-sm mt-1">
-          Name your vessel and christen it into the registry.
+          Name your vessel, upload a portrait for the view page, and christen it into the fleet.
         </p>
       </header>
 
@@ -62,6 +63,12 @@ export default function StepName({ ship, update, onSave, savedAt }: Props) {
             ⟳ Random
           </button>
         </div>
+
+        <ShipImageUpload
+          value={ship.shipImageDataUrl}
+          onChange={(shipImageDataUrl) => update((s) => ({ ...s, shipImageDataUrl }))}
+        />
+
         <button
           type="button"
           className={`btn btn-solid w-full !py-3 ${christened ? 'roll-flash' : ''}`}
@@ -99,7 +106,7 @@ export default function StepName({ ship, update, onSave, savedAt }: Props) {
       </div>
 
       {/* Final stat card preview */}
-      <StatBlock ship={ship} />
+      <StatBlock ship={ship} showCombat />
     </div>
   );
 }
