@@ -2,7 +2,7 @@
 // game-icons.net ship emblem helpers (CC BY 3.0).
 // ============================================================
 
-export const GAME_ICONS_BASE = '/game-icons/icons/ffffff/000000/1x1';
+export const GAME_ICONS_BASE = `${import.meta.env.BASE_URL}game-icons/icons/ffffff/000000/1x1`;
 export const DEFAULT_SHIP_ICON_ID = 'delapouite/spaceship';
 
 export interface GameIconEntry {
@@ -25,7 +25,7 @@ let manifestCache: GameIconManifest | null = null;
 
 export async function loadGameIconManifest(): Promise<GameIconManifest> {
   if (manifestCache) return manifestCache;
-  const res = await fetch('/game-icons/manifest.json');
+  const res = await fetch(`${import.meta.env.BASE_URL}game-icons/manifest.json`);
   if (!res.ok) throw new Error('Failed to load game icon manifest');
   manifestCache = (await res.json()) as GameIconManifest;
   return manifestCache;

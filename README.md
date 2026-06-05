@@ -112,10 +112,30 @@ Game math lives in `src/lib/rules.ts`; all rulebook numbers live in
 
 ## Deployment
 
-The app is a static SPA. Build and deploy `dist/` to **Vercel**, **Netlify**,
-**Render Static**, or **GitHub Pages**.
+### GitHub Pages (primary)
 
-For client-side routing, add a SPA fallback to `index.html`. On Vercel:
+Live site: **https://geph.github.io/dark-matter-ship-builder/**
+
+Pushes to `main` deploy automatically via
+[`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml).
+In the repo **Settings → Pages**, set **Source** to **GitHub Actions** if it is
+not already.
+
+Local production build matching Pages:
+
+```bash
+# Windows PowerShell
+$env:GITHUB_PAGES='true'; npm run build
+
+# macOS / Linux
+GITHUB_PAGES=true npm run build
+```
+
+### Other hosts
+
+The app is a static SPA. Build and deploy `dist/` to **Vercel**, **Netlify**, or
+**Render Static**. For client-side routing, add a SPA fallback to `index.html`.
+On Vercel:
 
 ```json
 { "rewrites": [{ "source": "/(.*)", "destination": "/" }] }
