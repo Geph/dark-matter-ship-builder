@@ -70,7 +70,8 @@ export const SYSTEMS: SystemDef[] = [
     id: 'escape-pods',
     name: 'Escape Pods',
     cost: 600,
-    description: 'Emergency evacuation capsules integrated into the hull structure.',
+    description:
+      'Emergency evacuation capsules integrated into the hull structure. Not compatible with custom fighter builds.',
     minSize: null,
     maxInstalls: 1,
     hullEmbedded: true,
@@ -83,7 +84,7 @@ export const SYSTEMS: SystemDef[] = [
     minSize: null,
     maxInstalls: null,
     maxBySize: { Fighter: Infinity },
-    note: 'Fighter-class hulls only. Must be purchased manually — never auto-installed.',
+    note: 'Fighter-class hulls only. Replaces standard Escape Pods on custom fighter builds.',
   },
   {
     id: 'fighter-bay',

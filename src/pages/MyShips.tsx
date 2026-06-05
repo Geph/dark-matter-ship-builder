@@ -1,13 +1,21 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { Ship } from '../lib/types';
-import { listShips, deleteShip, duplicateShip, saveShip } from '../lib/storage';
+import {
+  listShips,
+  deleteShip,
+  duplicateShip,
+  saveShip,
+  importShips,
+} from '../lib/storage';
 import { effectiveDmClass } from '../lib/rules';
+import { downloadShipExport, parseShipImportFile } from '../lib/shipTransfer';
 import ShipIcon from '../components/ShipIcon';
 import ShipIconPicker from '../components/ShipIconPicker';
 
 export default function MyShips() {
   const navigate = useNavigate();
+  const importInputRef = useRef<HTMLInputElement>(null);
   const [ships, setShips] = useState<Ship[]>(() => listShips());
   const [emblemEditId, setEmblemEditId] = useState<string | null>(null);
 
@@ -32,20 +40,67 @@ export default function MyShips() {
     refresh();
   };
 
+  const exportShips = (targets: Ship[]) => {
+    downloadShipExport(targets);
+  };
+
+  const handleImport = async (file: File) => {
+    try {
+      const text = await file.text();
+      const parsed = parseShipImportFile(text);
+      const count = importShips(parsed);
+      refresh();
+      alert(`Imported ${count} ship${count === 1 ? '' : 's'} into the registry.`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Import failed.';
+      alert(message);
+    } finally {
+      if (importInputRef.current) importInputRef.current.value = '';
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-6">
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".json,application/json"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void handleImport(file);
+        }}
+      />
+
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="font-display text-2xl text-cyan glow-text tracking-wider">
           MY SHIPS
         </h1>
-        <Link to="/build" className="btn btn-solid">
-          + New Ship
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="btn"
+            onClick={() => importInputRef.current?.click()}
+          >
+            ⬇ Import
+          </button>
+          {ships.length > 0 && (
+            <button type="button" className="btn" onClick={() => exportShips(ships)}>
+              ⬆ Export Fleet
+            </button>
+          )}
+          <Link to="/build" className="btn btn-solid">
+            + New Ship
+          </Link>
+        </div>
       </div>
 
       {ships.length === 0 ? (
         <div className="panel panel-corner p-10 text-center">
           <p className="text-slate-400">No ships in the registry yet.</p>
+          <p className="text-slate-500 text-sm mt-2">
+            Build a new ship or import a `.json` export from another device.
+          </p>
           <Link to="/build" className="btn btn-solid mt-4 inline-block">
             ⛬ Build your first ship
           </Link>
@@ -111,6 +166,13 @@ export default function MyShips() {
                 </button>
                 <button className="btn btn-amber !py-1 !px-3" onClick={() => duplicate(ship.id)}>
                   Duplicate
+                </button>
+                <button
+                  type="button"
+                  className="btn !py-1 !px-3"
+                  onClick={() => exportShips([ship])}
+                >
+                  Export
                 </button>
                 <button
                   className="btn btn-danger !py-1 !px-3"

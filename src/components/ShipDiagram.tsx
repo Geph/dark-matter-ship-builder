@@ -7,6 +7,7 @@ import {
 } from '../data/fighters';
 import {
   effectiveDmClass,
+  fighterSlotsUsed,
   fighterWeaponsByFacing,
   slotsUsed,
   weaponsByFacing,
@@ -57,7 +58,7 @@ export default function ShipDiagram({
   const byFacing = isBayFighter
     ? fighterWeaponsByFacing(fighterBay!.weapons)
     : weaponsByFacing(ship);
-  const used = isBayFighter ? fighterBay!.weapons.length : slotsUsed(ship);
+  const used = isBayFighter ? fighterSlotsUsed(fighterBay!) : slotsUsed(ship);
   const totalSlots = isBayFighter ? FIGHTER_SLOT_COUNT : ship.totalSlots;
   const dm = effectiveDmClass(ship);
   const pips = Array.from({ length: totalSlots }, (_, i) => i < used);
@@ -257,9 +258,11 @@ export default function ShipDiagram({
                   type="button"
                   onClick={() => fighterBayTargets.onSelect(i)}
                   className={`font-display text-[9px] tracking-widest px-2 py-1 rounded-sm border transition-all ${
-                    fighterBayTargets.active === i
-                      ? 'border-amber text-amber bg-amber/10'
-                      : 'border-slate-700 text-slate-400 hover:border-amber/50'
+                    bay.type === 'none'
+                      ? 'border-slate-700 text-slate-500 opacity-60'
+                      : fighterBayTargets.active === i
+                        ? 'border-fuchsia-400 text-fuchsia-300 bg-fuchsia-500/25 shadow-[0_0_14px_rgba(217,70,239,0.65)] glow-fuchsia'
+                        : 'border-fuchsia-500/70 text-fuchsia-400 bg-fuchsia-500/15 shadow-[0_0_10px_rgba(217,70,239,0.5)] glow-fuchsia hover:border-fuchsia-400'
                   }`}
                 >
                   F{i + 1}
@@ -279,7 +282,7 @@ export default function ShipDiagram({
         {isBayFighter
           ? 'Bay fighter weapons — select arc, then mount from the Weapons loadout (Fighter target).'
           : ship.isFighterBuild
-            ? 'Fighter hull: 6 slots. Systems requiring Personal size or larger are unavailable; weapons and most upgrades are allowed.'
+            ? 'Custom fighter: 6 slots, MHP ≥ 5 × level, shield generator = 8 SP. No standard Escape Pods or railguns.'
             : "Escape Pods, Life Support, Sensors, Shield Generator, and Pilot's Seat are integrated into the hull. Only weapons mount to arc hardpoints — Fixed weapons on Fore/Port/Starboard/Aft; all others on the Turret."}
       </p>
 

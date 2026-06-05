@@ -37,7 +37,8 @@ export const CREW_ROLES: CrewRole[] = [
   {
     id: 'pilot-fighter',
     label: 'Pilot (Fighter Bay)',
-    description: 'Flies a deployable fighter. Grants a Fighter Bay. Level 5+.',
+    description:
+      'Flies a deployable fighter. First Fighter Bay you install is free. Level 5+.',
     systemId: 'fighter-bay',
     minLevel: 5,
     skillFields: [

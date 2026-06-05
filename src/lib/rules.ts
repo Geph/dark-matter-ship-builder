@@ -1,5 +1,11 @@
 import type { FighterBaySlot, FighterType, Ship, ShipSize, ShipWeapon, WeaponFacing } from './types';
-import { fighterHullById, resolveFighterBayHull } from '../data/fighters';
+import {
+  defaultFighterBayLoadout,
+  emptyFighterBay,
+  FIGHTER_SLOT_COUNT,
+  fighterHullById,
+  resolveFighterBayHull,
+} from '../data/fighters';
 import { SYSTEMS_BY_ID, HULL_EMBEDDED_SYSTEM_IDS, type SystemDef } from '../data/systems';
 import { UPGRADES_BY_ID, DM_ENGINE_COSTS, type UpgradeDef } from '../data/upgrades';
 import { WEAPONS_BY_NAME, type WeaponDef } from '../data/weapons';
@@ -9,6 +15,27 @@ import { CREW_ROLES_BY_ID, STARTING_SYSTEM_IDS } from '../data/crewRoles';
 export function startingSystemIds(ship: Ship): string[] {
   if (ship.isFighterBuild) return ['life-support', 'sensors'];
   return STARTING_SYSTEM_IDS;
+}
+
+/** Custom fighter builds: minimum MHP is 5 × highest character level. */
+export function minimumCustomFighterMhp(level: number): number {
+  return 5 * Math.max(1, level);
+}
+
+/** MHP for a custom fighter build (template hull vs. level minimum). */
+export function customFighterMhp(ship: Ship): number {
+  const hull = fighterHullById(ship.fighterHullId ?? 'sabre');
+  return Math.max(minimumCustomFighterMhp(ship.level), hull?.mhp ?? 25);
+}
+
+const FIGHTER_BANNED_WEAPON_NAMES = new Set(['Railgun']);
+
+/** Weapons that cannot be mounted on fighter-class hulls. */
+export function canEquipWeaponOnFighterClass(def: WeaponDef): PrereqResult {
+  if (FIGHTER_BANNED_WEAPON_NAMES.has(def.name)) {
+    return { ok: false, reason: 'Railguns cannot be mounted on fighter-class ships.' };
+  }
+  return { ok: true };
 }
 import {
   SHIELD_POINTS_BY_SIZE,
@@ -49,11 +76,42 @@ export function syncFighterBays(ship: Ship): FighterBaySlot[] {
   const existing = ship.fighterBays ?? [];
   const bays: FighterBaySlot[] = [];
   for (let i = 0; i < count; i++) {
-    bays.push(
-      existing[i] ?? { type: 'none', catalogId: null, customShipId: null, weapons: [] },
-    );
+    bays.push(existing[i] ?? emptyFighterBay());
   }
   return bays;
+}
+
+/** Credits for fighter loadout changes beyond the rulebook stock gear (bundled in deploy cost). */
+export function fighterBayLoadoutBillableCost(bay: FighterBaySlot): number {
+  if (bay.type === 'none' || !bay.catalogId) return 0;
+  const stock = defaultFighterBayLoadout(bay.catalogId);
+  let total = 0;
+
+  const systemIds = new Set([
+    ...Object.keys(bay.systems),
+    ...Object.keys(stock.systems),
+  ]);
+  for (const id of systemIds) {
+    const def = SYSTEMS_BY_ID[id];
+    if (!def) continue;
+    const billable = Math.max(0, (bay.systems[id] ?? 0) - (stock.systems[id] ?? 0));
+    total += def.cost * billable;
+  }
+
+  const stockWeapons = [...stock.weapons];
+  for (const w of bay.weapons) {
+    const matchIdx = stockWeapons.findIndex(
+      (s) => s.name === w.name && s.facing === w.facing,
+    );
+    if (matchIdx >= 0) {
+      stockWeapons.splice(matchIdx, 1);
+      continue;
+    }
+    const def = WEAPONS_BY_NAME[w.name];
+    if (def) total += def.cost;
+  }
+
+  return total;
 }
 
 export function fighterBayDeployCost(bay: FighterBaySlot): number {
@@ -84,7 +142,7 @@ export function grantedSystemCounts(ship: Ship): Record<string, number> {
  * crew roles change so auto-added systems appear in the loadout.
  */
 /** Systems that must be manually installed — never auto-granted. */
-export const NEVER_AUTO_INSTALL_IDS = ['escape-pod-fighter'];
+export const NEVER_AUTO_INSTALL_IDS = ['escape-pod-fighter', 'fighter-bay'];
 
 export function withGrantedSystems(ship: Ship): Record<string, number> {
   const granted = grantedSystemCounts(ship);
@@ -134,10 +192,49 @@ export function computeCreditsSpent(ship: Ship): number {
   }
 
   for (const bay of syncFighterBays(ship)) {
+    if (bay.type === 'none') continue;
     total += fighterBayDeployCost(bay);
+    total += fighterBayLoadoutBillableCost(bay);
   }
 
   return total;
+}
+
+/** Hardpoint slots used on a deployed fighter (systems + weapons). */
+export function fighterSlotsUsed(bay: FighterBaySlot): number {
+  const systemSlots = Object.values(bay.systems).reduce((a, b) => a + b, 0);
+  return systemSlots + bay.weapons.length;
+}
+
+export function fighterSlotsRemaining(bay: FighterBaySlot): number {
+  return FIGHTER_SLOT_COUNT - fighterSlotsUsed(bay);
+}
+
+/** Can this system be installed on a deployed fighter bay? */
+export function canInstallFighterSystem(bay: FighterBaySlot, def: SystemDef): PrereqResult {
+  if (bay.type === 'none') {
+    return { ok: false, reason: 'Select a pre-built fighter for this bay first.' };
+  }
+  if (def.id === 'escape-pods') {
+    return {
+      ok: false,
+      reason: 'Standard Escape Pods are incompatible with fighters. Use Escape Pod (Fighter).',
+    };
+  }
+  const size: ShipSize = 'Fighter';
+  if (def.minSize && sizeRank(size) < sizeRank(def.minSize)) {
+    return { ok: false, reason: `Requires ${def.minSize} size or larger.` };
+  }
+  const current = bay.systems[def.id] ?? 0;
+  const max = maxInstallsForSystem(def, size);
+  if (current >= max) {
+    if (max === 0) return { ok: false, reason: `Not available on fighter-class ships.` };
+    return { ok: false, reason: `Maximum of ${max} installed on this fighter.` };
+  }
+  if (fighterSlotsRemaining(bay) <= 0) {
+    return { ok: false, reason: 'No free fighter slots.' };
+  }
+  return { ok: true };
 }
 
 /**
@@ -188,6 +285,12 @@ export interface PrereqResult {
 
 /** Can this system be installed (size prereq + repeat caps)? */
 export function canInstallSystem(ship: Ship, def: SystemDef): PrereqResult {
+  if (ship.isFighterBuild && def.id === 'escape-pods') {
+    return {
+      ok: false,
+      reason: 'Standard Escape Pods are incompatible with custom fighter builds. Use Escape Pod (Fighter).',
+    };
+  }
   if (def.minSize && sizeRank(ship.size) < sizeRank(def.minSize)) {
     return { ok: false, reason: `Requires ${def.minSize} size or larger.` };
   }
@@ -224,11 +327,25 @@ export function validateShip(ship: Ship): string[] {
   const spent = computeCreditsSpent(ship);
   const used = slotsUsed(ship);
 
-  // Rule 1: at least one Pilot's Seat or Fighter Bay.
-  const pilots = ship.systems['pilots-seat'] ?? 0;
-  const fighterBaysInstalled = ship.systems['fighter-bay'] ?? 0;
-  if (pilots + fighterBaysInstalled < 1) {
-    errors.push("Every ship needs at least one Pilot's Seat or Fighter Bay.");
+  // Rule 1: every ship needs helm control. Fighter bays are optional.
+  if (!ship.isFighterBuild) {
+    const pilots = ship.systems['pilots-seat'] ?? 0;
+    if (pilots < 1) {
+      errors.push("Every ship needs at least one Pilot's Seat.");
+    }
+  }
+
+  if (ship.isFighterBuild) {
+    if ((ship.systems['escape-pods'] ?? 0) > 0) {
+      errors.push(
+        'Standard Escape Pods are incompatible with custom fighter builds. Use Escape Pod (Fighter).',
+      );
+    }
+    if (ship.mhp < minimumCustomFighterMhp(ship.level)) {
+      errors.push(
+        `Custom fighter MHP must be at least ${minimumCustomFighterMhp(ship.level)} (5 × level).`,
+      );
+    }
   }
 
   // Rules 2,6,7,8,9: per-system size & repeat caps.
@@ -275,17 +392,47 @@ export function validateShip(ship: Ship): string[] {
     if (!mount.ok) {
       errors.push(`${def.name} [${w.facing}]: ${mount.reason}`);
     }
+    if (ship.isFighterBuild) {
+      const fighterWeapon = canEquipWeaponOnFighterClass(def);
+      if (!fighterWeapon.ok) {
+        errors.push(`${def.name}: ${fighterWeapon.reason}`);
+      }
+    }
   }
 
   const fighterSlots = syncFighterBays(ship);
   fighterSlots.forEach((bay, i) => {
     if (bay.type === 'none') return;
+    const label = bay.displayName?.trim() || `Fighter ${i + 1}`;
+    const used = fighterSlotsUsed(bay);
+    if (used > FIGHTER_SLOT_COUNT) {
+      errors.push(`${label}: over fighter slot capacity (${used}/${FIGHTER_SLOT_COUNT}).`);
+    }
+    for (const [id, count] of Object.entries(bay.systems)) {
+      if (count <= 0) continue;
+      if (id === 'escape-pods') {
+        errors.push(
+          `${label} — Standard Escape Pods are incompatible with fighters. Use Escape Pod (Fighter).`,
+        );
+        continue;
+      }
+      const def = SYSTEMS_BY_ID[id];
+      if (!def) continue;
+      const max = maxInstallsForSystem(def, 'Fighter');
+      if (count > max) {
+        errors.push(`${label} — ${def.name}: ${count} installed but max is ${max}.`);
+      }
+    }
     for (const w of bay.weapons) {
       const def = WEAPONS_BY_NAME[w.name];
       if (!def) continue;
       const mount = canMountWeapon(def, w.facing);
       if (!mount.ok) {
-        errors.push(`Fighter ${i + 1} — ${def.name} [${w.facing}]: ${mount.reason}`);
+        errors.push(`${label} — ${def.name} [${w.facing}]: ${mount.reason}`);
+      }
+      const fighterWeapon = canEquipWeaponOnFighterClass(def);
+      if (!fighterWeapon.ok) {
+        errors.push(`${label} — ${def.name}: ${fighterWeapon.reason}`);
       }
     }
   });
@@ -378,6 +525,10 @@ export function addWeapon(
 ): Ship {
   const def = WEAPONS_BY_NAME[name];
   if (!def) return { ...ship, weapons: [...ship.weapons, { name, facing }] };
+  if (ship.isFighterBuild) {
+    const fighterCheck = canEquipWeaponOnFighterClass(def);
+    if (!fighterCheck.ok) return ship;
+  }
   const resolved = resolveMountFacing(def, facing);
   const check = canMountWeapon(def, resolved);
   if (!check.ok) return ship;
@@ -389,19 +540,19 @@ export function removeWeaponAt(ship: Ship, index: number): Ship {
   return { ...ship, weapons: ship.weapons.filter((_, i) => i !== index) };
 }
 
-/** Set the fighter type for a bay and load book-default weapons. */
+/** Clear a fighter bay or assign a pre-built catalog hull with stock weapons. */
 export function setFighterBayType(ship: Ship, bayIndex: number, type: FighterType): Ship {
   const bays = syncFighterBays(ship).map((bay, i) => {
     if (i !== bayIndex) return bay;
-    const hull =
-      type === 'catalog'
-        ? null
-        : resolveFighterBayHull({ type, catalogId: null, customShipId: null, weapons: [] });
+    if (type === 'none') return emptyFighterBay();
+    const catalogId = bay.catalogId ?? 'sabre';
+    const loadout = defaultFighterBayLoadout(catalogId);
     return {
-      type,
-      catalogId: type === 'catalog' ? (bay.catalogId ?? 'sabre') : null,
-      customShipId: null,
-      weapons: hull ? [...hull.defaultWeapons] : [],
+      type: 'catalog' as const,
+      catalogId,
+      displayName: bay.displayName,
+      systems: loadout.systems,
+      weapons: loadout.weapons,
     };
   });
   return { ...ship, fighterBays: bays };
@@ -414,34 +565,59 @@ export function setFighterBayCatalogId(
 ): Ship {
   const bays = syncFighterBays(ship).map((bay, i) => {
     if (i !== bayIndex) return bay;
-    const hull = fighterHullById(catalogId);
+    const loadout = defaultFighterBayLoadout(catalogId);
     return {
-      type: 'catalog' as FighterType,
+      type: 'catalog' as const,
       catalogId,
-      customShipId: null,
-      weapons: hull ? [...hull.defaultWeapons] : bay.weapons,
+      displayName: bay.displayName,
+      systems: loadout.systems,
+      weapons: loadout.weapons,
     };
   });
   return { ...ship, fighterBays: bays };
 }
 
-/** Populate a fighter bay from a user-saved fighter build. */
-export function setFighterBayFromCustomShip(
+export function setFighterBayDisplayName(
   ship: Ship,
   bayIndex: number,
-  customShip: Ship,
+  displayName: string,
 ): Ship {
-  const hullId = customShip.fighterHullId;
-  const bays = syncFighterBays(ship).map((bay, i) => {
-    if (i !== bayIndex) return bay;
-    return {
-      ...bay,
-      type: 'catalog' as FighterType,
-      catalogId: hullId ?? bay.catalogId,
-      customShipId: customShip.id,
-      weapons: [...customShip.weapons],
-    };
-  });
+  const bays = syncFighterBays(ship).map((bay, i) =>
+    i === bayIndex ? { ...bay, displayName } : bay,
+  );
+  return { ...ship, fighterBays: bays };
+}
+
+export function installFighterSystem(
+  ship: Ship,
+  bayIndex: number,
+  systemId: string,
+): Ship {
+  const def = SYSTEMS_BY_ID[systemId];
+  if (!def) return ship;
+  const bays = syncFighterBays(ship);
+  const bay = bays[bayIndex];
+  if (!bay || !canInstallFighterSystem(bay, def).ok) return ship;
+  bays[bayIndex] = {
+    ...bay,
+    systems: { ...bay.systems, [systemId]: (bay.systems[systemId] ?? 0) + 1 },
+  };
+  return { ...ship, fighterBays: bays };
+}
+
+export function removeFighterSystem(
+  ship: Ship,
+  bayIndex: number,
+  systemId: string,
+): Ship {
+  const bays = syncFighterBays(ship);
+  const bay = bays[bayIndex];
+  if (!bay) return ship;
+  const systems = { ...bay.systems };
+  const next = (systems[systemId] ?? 0) - 1;
+  if (next <= 0) delete systems[systemId];
+  else systems[systemId] = next;
+  bays[bayIndex] = { ...bay, systems };
   return { ...ship, fighterBays: bays };
 }
 
@@ -466,9 +642,12 @@ export function addFighterWeapon(
   const bays = syncFighterBays(ship);
   const bay = bays[bayIndex];
   if (!bay || bay.type === 'none') return ship;
+  if (fighterSlotsRemaining(bay) <= 0) return ship;
 
   const resolved = def ? resolveMountFacing(def, facing) : facing;
   if (def) {
+    const fighterCheck = canEquipWeaponOnFighterClass(def);
+    if (!fighterCheck.ok) return ship;
     const check = canMountWeapon(def, resolved);
     if (!check.ok) return ship;
   }

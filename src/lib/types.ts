@@ -20,15 +20,17 @@ export interface ShipWeapon {
   facing: WeaponFacing;
 }
 
-/** Fighter craft deployed from a Fighter Bay (Dark Matter ship catalog). */
-export type FighterType = 'none' | 'sabre' | 'interceptor' | 'rig' | 'swarmer' | 'catalog';
+/** Fighter craft deployed from a Fighter Bay (pre-built catalog hull). */
+export type FighterType = 'none' | 'catalog';
 
 export interface FighterBaySlot {
   type: FighterType;
   /** Catalog hull id when type is `catalog` (see fighters.ts). */
   catalogId: string | null;
-  /** If the bay is populated from a user-saved fighter build, this is that ship id. */
-  customShipId: string | null;
+  /** Player-assigned call sign; falls back to hull name when empty. */
+  displayName: string;
+  /** Independent loadout — does not share slots or systems with the mothership. */
+  systems: Record<string, number>;
   weapons: ShipWeapon[];
 }
 

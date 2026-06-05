@@ -90,7 +90,7 @@ export function shipDimensions(
 
 /** Shield Points granted by a Shield Generator, by ship size (p.219). */
 export const SHIELD_POINTS_BY_SIZE: Record<ShipSize, number> = {
-  Fighter: 4,
+  Fighter: 8,
   Personal: 8,
   Transport: 12,
   Corvette: 16,

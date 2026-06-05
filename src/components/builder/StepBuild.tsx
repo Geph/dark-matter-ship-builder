@@ -6,7 +6,6 @@ import { RANGED_WEAPONS, MELEE_WEAPONS, type WeaponDef } from '../../data/weapon
 import { DM_ENGINE_COSTS } from '../../data/upgrades';
 import { statsForLevel } from '../../data/shipStats';
 import InfoTooltip from '../InfoTooltip';
-import { listShips } from '../../lib/storage';
 import {
   effectiveBudget,
   computeCreditsSpent,
@@ -14,23 +13,28 @@ import {
   lockedInstalls,
   maxInstallsForSystem,
   canInstallSystem,
+  canInstallFighterSystem,
   canInstallUpgrade,
   installSystem,
   removeSystem,
+  installFighterSystem,
+  removeFighterSystem,
   addWeapon,
   addFighterWeapon,
   setFighterBayType,
   setFighterBayCatalogId,
-  setFighterBayFromCustomShip,
+  setFighterBayDisplayName,
   syncFighterBays,
+  fighterSlotsRemaining,
   effectiveDmClass,
   dmEngineUpgradeCost,
   weaponHasFixed,
   canMountWeapon,
   resolveMountFacing,
   isHullEmbeddedSystem,
+  canEquipWeaponOnFighterClass,
 } from '../../lib/rules';
-import { FIGHTER_CATALOG, resolveFighterBayHull } from '../../data/fighters';
+import { FIGHTER_CATALOG, fighterDisplayName, resolveFighterBayHull } from '../../data/fighters';
 
 interface Props {
   ship: Ship;
@@ -63,7 +67,7 @@ export default function StepBuild({ ship, update, selectedFacing, configTarget }
         </h2>
         <p className="text-slate-400 text-sm mt-1">
           {ship.isFighterBuild
-            ? 'Fighter hulls have 6 slots. Install any system without a Personal-size minimum — Shield Generator, Pilot\'s Seat, Life Support, Sensors, and Escape Pod (Fighter) are all valid. Weapons and most upgrades have no size limit.'
+            ? 'Custom fighters have 6 slots and MHP of at least 5 × level. Shield generators provide 8 SP. Standard Escape Pods (600 CR) are incompatible — use Escape Pod (Fighter). Railguns cannot be mounted.'
             : 'Spend Credits on systems, weapons, and upgrades. Hull-embedded systems are pre-installed in the body. Only weapons use mount points — Fixed on arc facings, others on the Turret.'}{' '}
           Hover the <span className="text-amber">i</span> icon for details.
         </p>
@@ -86,7 +90,13 @@ export default function StepBuild({ ship, update, selectedFacing, configTarget }
       </div>
 
       {tab === 'systems' && (
-        <SystemsTab ship={ship} update={update} remaining={remaining} freeSlots={freeSlots} />
+        <SystemsTab
+          ship={ship}
+          update={update}
+          remaining={remaining}
+          freeSlots={freeSlots}
+          configTarget={configTarget}
+        />
       )}
       {tab === 'weapons' && (
         <WeaponsTab
@@ -117,12 +127,18 @@ function SystemsTab({
   update,
   remaining,
   freeSlots,
+  configTarget,
 }: {
   ship: Ship;
   update: Props['update'];
   remaining: number;
   freeSlots: number;
+  configTarget: Props['configTarget'];
 }) {
+  const mountingFighter = configTarget !== 'mothership';
+  const fighterBay = mountingFighter ? syncFighterBays(ship)[configTarget] : null;
+  const fighterBlocked = mountingFighter && (!fighterBay || fighterBay.type === 'none');
+  const fighterFreeSlots = fighterBay ? fighterSlotsRemaining(fighterBay) : 0;
   const autoNonRepeatable = useMemo(() => {
     const out: typeof SYSTEMS = [];
     for (const def of SYSTEMS) {
@@ -139,7 +155,21 @@ function SystemsTab({
 
   return (
     <div className="space-y-3">
-      {autoNonRepeatable.length > 0 && (
+      {mountingFighter && (
+        <div className="panel p-2 font-mono-hud text-[11px] text-slate-300">
+          <span className="text-fuchsia-400">TARGET:</span>{' '}
+          <span className="text-fuchsia-300 glow-fuchsia">
+            {fighterBay ? fighterDisplayName(fighterBay) : `Fighter ${(configTarget as number) + 1}`}
+          </span>
+          {fighterBay && fighterBay.type !== 'none' && (
+            <span className="text-slate-500 ml-2">
+              · {fighterFreeSlots} fighter slot{fighterFreeSlots === 1 ? '' : 's'} free
+            </span>
+          )}
+        </div>
+      )}
+
+      {autoNonRepeatable.length > 0 && !mountingFighter && (
         <div className="panel p-3 border-slate-700/60">
           <p className="font-display text-[11px] tracking-[0.25em] text-amber mb-2">
             AUTO-INCLUDED (NON-REPEATABLE)
@@ -164,18 +194,29 @@ function SystemsTab({
 
       <div className="grid sm:grid-cols-2 gap-3">
         {SYSTEMS.map((def) => {
-          if (autoSet.has(def.id)) return null;
-        const count = ship.systems[def.id] ?? 0;
-        const locked = lockedInstalls(ship, def.id);
-        const prereq = canInstallSystem(ship, def);
-        const nextIsFree = count < locked;
+          if (ship.isFighterBuild && def.id === 'escape-pods') return null;
+          if (!mountingFighter && autoSet.has(def.id)) return null;
+        const count = mountingFighter
+          ? (fighterBay?.systems[def.id] ?? 0)
+          : (ship.systems[def.id] ?? 0);
+        const locked = mountingFighter ? 0 : lockedInstalls(ship, def.id);
+        const prereq = mountingFighter
+          ? fighterBay
+            ? canInstallFighterSystem(fighterBay, def)
+            : { ok: false, reason: 'Select a fighter first.' }
+          : canInstallSystem(ship, def);
+        const nextIsFree = !mountingFighter && count < locked;
         const nextCost = nextIsFree ? 0 : def.cost;
         const noBudget = nextCost > remaining;
-        const noSlots = freeSlots <= 0;
-        const blockedReason = !prereq.ok
+        const noSlots = mountingFighter ? fighterFreeSlots <= 0 : freeSlots <= 0;
+        const blockedReason = fighterBlocked
+          ? 'Select a pre-built fighter on the Fighter Bay loadout item first.'
+          : !prereq.ok
           ? prereq.reason
           : noSlots
-            ? 'No free slots — remove a component first.'
+            ? mountingFighter
+              ? 'No free fighter slots.'
+              : 'No free slots — remove a component first.'
             : noBudget
               ? 'Not enough Credits.'
               : undefined;
@@ -220,7 +261,13 @@ function SystemsTab({
                     className="btn btn-danger !px-2 !py-0.5"
                     disabled={count <= locked}
                     title={count <= locked ? 'Granted free by crew/role — cannot remove.' : 'Uninstall'}
-                    onClick={() => update((s) => removeSystem(s, def.id))}
+                    onClick={() =>
+                      update((s) =>
+                        mountingFighter
+                          ? removeFighterSystem(s, configTarget as number, def.id)
+                          : removeSystem(s, def.id),
+                      )
+                    }
                   >
                     −
                   </button>
@@ -229,7 +276,13 @@ function SystemsTab({
                     className="btn btn-solid !px-2 !py-0.5"
                     disabled={!!blockedReason}
                     title={blockedReason}
-                    onClick={() => update((s) => installSystem(s, def.id))}
+                    onClick={() =>
+                      update((s) =>
+                        mountingFighter
+                          ? installFighterSystem(s, configTarget as number, def.id)
+                          : installSystem(s, def.id),
+                      )
+                    }
                   >
                     +
                   </button>
@@ -264,105 +317,54 @@ function FighterBayAssignments({
   bayCount: number;
 }) {
   const bays = syncFighterBays(ship);
-  const savedFighters = useMemo(
-    () => listShips().filter((s) => s.isFighterBuild),
-    [],
-  );
-  const savedById = useMemo(
-    () => new Map(savedFighters.map((f) => [f.id, f])),
-    [savedFighters],
-  );
 
   return (
-    <div className="mt-3 pt-2 border-t border-slate-700/60 space-y-2">
-      <p className="font-mono-hud text-[10px] text-slate-400">Deployed fighters (per bay):</p>
+    <div className="mt-3 pt-2 border-t border-slate-700/60 space-y-3">
+      <p className="font-mono-hud text-[10px] text-slate-400">
+        Pre-built fighters (each bay has its own 6-slot loadout):
+      </p>
       {Array.from({ length: bayCount }, (_, i) => {
         const bay = bays[i];
-        const mode =
-          bay?.type === 'none' ? 'none' : bay?.customShipId ? 'custom' : 'prebuilt';
         const hull = bay?.type === 'none' ? null : resolveFighterBayHull(bay);
-        const customShip = bay?.customShipId
-          ? savedById.get(bay.customShipId) ?? null
-          : null;
         return (
-          <div key={i} className="flex flex-col gap-1">
+          <div key={i} className="flex flex-col gap-1.5 panel p-2 bg-void/30">
             <label className="font-mono-hud text-[10px] text-slate-500">
               Bay {i + 1}
             </label>
             <select
-              value={mode}
+              value={bay?.type === 'none' ? 'none' : (bay?.catalogId ?? 'sabre')}
               onChange={(e) => {
                 const next = e.target.value;
                 if (next === 'none') {
                   update((s) => setFighterBayType(s, i, 'none'));
                   return;
                 }
-                if (next === 'prebuilt') {
-                  update((s) =>
-                    setFighterBayCatalogId(s, i, bay?.catalogId ?? 'sabre'),
-                  );
-                  return;
-                }
-                const first = savedFighters[0];
-                if (first) update((s) => setFighterBayFromCustomShip(s, i, first));
+                update((s) => setFighterBayCatalogId(s, i, next));
               }}
               className="w-full bg-void border border-cyan/40 rounded-sm px-2 py-1 font-mono-hud text-xs text-cyan"
             >
               <option value="none">None</option>
-              <option value="prebuilt">Pre-built fighter</option>
-              <option value="custom">Customized fighter</option>
+              {FIGHTER_CATALOG.map((h) => (
+                <option key={h.id} value={h.id}>
+                  {h.name} — {h.subtitle}
+                </option>
+              ))}
             </select>
-
-            {mode === 'prebuilt' && (
-              <select
-                value={bay?.catalogId ?? 'sabre'}
+            {bay?.type !== 'none' && (
+              <input
+                type="text"
+                value={bay.displayName}
+                placeholder={`Call sign (default: ${hull?.name ?? 'fighter'})`}
                 onChange={(e) =>
-                  update((s) => setFighterBayCatalogId(s, i, e.target.value))
+                  update((s) => setFighterBayDisplayName(s, i, e.target.value))
                 }
                 className="w-full bg-void border border-amber/40 rounded-sm px-2 py-1 font-mono-hud text-xs text-amber"
-              >
-                {FIGHTER_CATALOG.map((h) => (
-                  <option key={h.id} value={h.id}>
-                    {h.name} — {h.subtitle}
-                  </option>
-                ))}
-              </select>
+              />
             )}
-
-            {mode === 'custom' && (
-              <select
-                value={bay?.customShipId ?? ''}
-                onChange={(e) => {
-                  const next = savedById.get(e.target.value);
-                  if (next) update((s) => setFighterBayFromCustomShip(s, i, next));
-                }}
-                className="w-full bg-void border border-amber/40 rounded-sm px-2 py-1 font-mono-hud text-xs text-amber"
-                disabled={savedFighters.length === 0}
-                title={savedFighters.length === 0 ? 'Create a customized fighter first.' : undefined}
-              >
-                {savedFighters.length === 0 ? (
-                  <option value="">No customized fighters saved</option>
-                ) : (
-                  <>
-                    {savedFighters.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.name || 'Untitled fighter'} ({f.fighterHullId ?? 'unknown'})
-                      </option>
-                    ))}
-                  </>
-                )}
-              </select>
-            )}
-
-            {mode === 'prebuilt' && hull && (
+            {hull && (
               <p className="font-mono-hud text-[9px] text-slate-500">
-                {hull.subtitle} · {hull.cost.toLocaleString()} CR · AC {hull.ac} MHP {hull.mhp}
-              </p>
-            )}
-
-            {mode === 'custom' && customShip && (
-              <p className="font-mono-hud text-[9px] text-slate-500">
-                Custom build · {customShip.fighterHullId ?? 'unknown'} · weapons: {customShip.weapons.length}
+                {hull.subtitle} · {hull.cost.toLocaleString()} CR deploy · AC {hull.ac} MHP{' '}
+                {hull.mhp} · configure loadout via F{i + 1} on the hull diagram
               </p>
             )}
           </div>
@@ -391,6 +393,7 @@ function WeaponsTab({
   const mountingFighter = configTarget !== 'mothership';
   const fighterBay = mountingFighter ? syncFighterBays(ship)[configTarget] : null;
   const fighterBlocked = mountingFighter && (!fighterBay || fighterBay.type === 'none');
+  const fighterFreeSlots = fighterBay ? fighterSlotsRemaining(fighterBay) : 0;
   const renderGroup = (title: string, weapons: WeaponDef[]) => (
     <div>
       <h3 className="font-display text-xs tracking-widest text-amber mb-2">{title}</h3>
@@ -399,19 +402,27 @@ function WeaponsTab({
           const fixed = weaponHasFixed(w);
           const mountFacing = resolveMountFacing(w, selectedFacing);
           const mountCheck = canMountWeapon(w, mountFacing);
+          const fighterContext = mountingFighter || ship.isFighterBuild;
+          const fighterWeaponCheck = fighterContext
+            ? canEquipWeaponOnFighterClass(w)
+            : { ok: true as const };
           const noBudget = w.cost > remaining;
-          const noSlots = !mountingFighter && freeSlots <= 0;
+          const noSlots = mountingFighter ? fighterFreeSlots <= 0 : freeSlots <= 0;
           const mountBlocked = !mountCheck.ok;
-          const blocked = fighterBlocked || noSlots || noBudget || mountBlocked;
+          const fighterWeaponBlocked = !fighterWeaponCheck.ok;
+          const blocked =
+            fighterBlocked || noSlots || noBudget || mountBlocked || fighterWeaponBlocked;
           const reason = fighterBlocked
             ? 'Select a fighter on the Fighter Bay loadout item first.'
-            : mountBlocked
-              ? mountCheck.reason
-              : noSlots
-                ? 'No free slots.'
-                : noBudget
-                  ? 'Not enough Credits.'
-                  : undefined;
+            : fighterWeaponBlocked
+              ? fighterWeaponCheck.reason
+              : mountBlocked
+                ? mountCheck.reason
+                : noSlots
+                  ? 'No free slots.'
+                  : noBudget
+                    ? 'Not enough Credits.'
+                    : undefined;
           const mountLabel = fixed ? `Mount ▸ ${selectedFacing}` : 'Mount ▸ Turret (auto)';
 
           return (
@@ -467,8 +478,8 @@ function WeaponsTab({
   return (
     <div className="space-y-5">
       <div className="panel p-2 font-mono-hud text-[11px] text-slate-300 flex flex-wrap items-center gap-2">
-        <span className="text-amber">TARGET:</span>
-        <span className={mountingFighter ? 'text-amber glow-amber' : 'text-cyan glow-text'}>
+        <span className={mountingFighter ? 'text-fuchsia-400' : 'text-amber'}>TARGET:</span>
+        <span className={mountingFighter ? 'text-fuchsia-300 glow-fuchsia' : 'text-cyan glow-text'}>
           {mountingFighter ? `Fighter ${(configTarget as number) + 1}` : 'Mothership'}
         </span>
         <span className="text-slate-500">·</span>

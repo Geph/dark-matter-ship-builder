@@ -1,7 +1,12 @@
 import type { FighterBaySlot, Ship } from './types';
 import { statsForLevel } from '../data/shipStats';
-import { fighterHullById, FIGHTER_SLOT_COUNT } from '../data/fighters';
-import { computeCreditsSpent, computeShieldPoints, syncFighterBays } from './rules';
+import { fighterHullById, FIGHTER_SLOT_COUNT, normalizeFighterBayType } from '../data/fighters';
+import {
+  computeCreditsSpent,
+  computeShieldPoints,
+  customFighterMhp,
+  syncFighterBays,
+} from './rules';
 
 // ============================================================
 // Persistence layer. Currently backed by the browser's
@@ -86,7 +91,7 @@ export function recomputeShip(ship: Ship): Ship {
       players: 1,
       size: 'Fighter',
       darkMatterClass: 0,
-      mhp: hull?.mhp ?? 25,
+      mhp: customFighterMhp(ship),
       ac: hull?.ac ?? 13,
       speed: hull?.speed ?? 3500,
       maneuverability: hull?.maneuverability ?? 180,
@@ -154,27 +159,33 @@ function normalizeShip(ship: Ship & { megaSpells?: string[] }): Ship {
     };
   }
   const { megaSpells: _legacy, ...rest } = ship;
+  const systems = { ...(rest.systems ?? {}) };
+  let weapons = [...(rest.weapons ?? [])];
+  if (rest.isFighterBuild) {
+    delete systems['escape-pods'];
+    weapons = weapons.filter((w) => w.name !== 'Railgun');
+  }
   return {
     ...rest,
+    systems,
     crewMembers,
     iconId: rest.iconId ?? null,
     shipImageDataUrl: rest.shipImageDataUrl ?? null,
     fighterBays: (rest.fighterBays ?? []).map((bay) => {
-      const legacy = bay as FighterBaySlot & { customName?: string; type?: string };
-      const rawType = String(legacy.type ?? 'none');
-      const type: FighterBaySlot['type'] =
-        rawType === 'custom' ? 'catalog' : (rawType as FighterBaySlot['type']);
+      const normalized = normalizeFighterBayType(
+        bay as FighterBaySlot & { customShipId?: string | null },
+      );
       return {
-        type,
-        catalogId: legacy.catalogId ?? (type === 'catalog' ? 'sabre' : null),
-        customShipId: (legacy as FighterBaySlot & { customShipId?: string }).customShipId ?? null,
-        weapons: (legacy.weapons ?? []).map((w) => ({
-          ...w,
-          name: fixWeaponName(w.name),
-        })),
+        ...normalized,
+        weapons: normalized.weapons
+          .filter((w) => w.name !== 'Railgun')
+          .map((w) => ({
+            ...w,
+            name: fixWeaponName(w.name),
+          })),
       };
     }),
-    weapons: (rest.weapons ?? []).map((w) => ({
+    weapons: weapons.map((w) => ({
       ...w,
       name: fixWeaponName(w.name),
     })),
@@ -226,6 +237,38 @@ export function saveShip(ship: Ship): Ship {
 
 export function deleteShip(id: string): void {
   writeAll(readAll().filter((s) => s.id !== id));
+}
+
+/**
+ * Import one or more ships from an export file. Assigns new ids and share
+ * tokens, remaps fighter-bay customShipId references within the batch.
+ */
+export function importShips(rawShips: unknown[]): number {
+  if (rawShips.length === 0) return 0;
+
+  const now = new Date().toISOString();
+  const idMap = new Map<string, string>();
+  const staged: Ship[] = [];
+
+  for (const raw of rawShips) {
+    const normalized = normalizeShip(raw as Ship & { megaSpells?: string[] });
+    const oldId = normalized.id || uuid();
+    const newId = uuid();
+    idMap.set(oldId, newId);
+    staged.push({
+      ...normalized,
+      id: newId,
+      shareToken: uuid(),
+      createdAt: normalized.createdAt || now,
+      updatedAt: now,
+    });
+  }
+
+  for (const ship of staged) {
+    saveShip(ship);
+  }
+
+  return staged.length;
 }
 
 export function duplicateShip(id: string): Ship | undefined {

@@ -4,7 +4,7 @@ import { SYSTEMS_BY_ID } from '../../data/systems';
 import { MEGA_SPELLS } from '../../data/megaSpells';
 import { statsForLevel } from '../../data/shipStats';
 import { FIGHTER_CATALOG, fighterHullById } from '../../data/fighters';
-import { effectiveBudget, setFighterBuildHull } from '../../lib/rules';
+import { customFighterMhp, effectiveBudget, setFighterBuildHull } from '../../lib/rules';
 
 interface Props {
   ship: Ship;
@@ -122,7 +122,7 @@ export default function StepCrew({ ship, update }: Props) {
           </div>
           <p className="glow-green font-mono-hud text-xs mt-2 tracking-wide uppercase">
             {ship.isFighterBuild && fighterHull
-              ? `Fighter · ${fighterHull.name} · 6 slots · MHP ${fighterHull.mhp} · AC ${fighterHull.ac}`
+              ? `Fighter · ${fighterHull.name} · 6 slots · MHP ${customFighterMhp(ship)} (min ${5 * ship.level}) · AC ${fighterHull.ac}`
               : `${stats.size} · DM Class ${stats.dmClass} · ${stats.slots} slots · MHP ${stats.mhp}`}
           </p>
 

@@ -8,7 +8,7 @@ import { CREW_ACTIONS_BY_ROLE } from '../data/crewActions';
 import CrewActionPanel from './CrewActionPanel';
 import ShipIcon from './ShipIcon';
 import { mapSizeFeet, shipDimensions } from '../data/shipStats';
-import { fighterDisplayName } from '../data/fighters';
+import { fighterDisplayName, resolveFighterBayHull } from '../data/fighters';
 import {
   effectiveDmClass,
   slotsUsed,
@@ -16,7 +16,9 @@ import {
   isHullEmbeddedSystem,
   gunnerAttackBonus,
   syncFighterBays,
+  fighterSlotsUsed,
 } from '../lib/rules';
+import { FIGHTER_SLOT_COUNT } from '../data/fighters';
 
 const STAT_LABEL = 'text-[9px] tracking-widest text-slate-400';
 const STAT_VALUE = 'font-display text-[1.0125rem]';
@@ -191,15 +193,41 @@ export default function StatBlock({
         <ul className="space-y-3 text-sm">
           {syncFighterBays(ship).map((bay, i) => {
             if (bay.type === 'none') return null;
-              const label = fighterDisplayName(bay);
+            const label = fighterDisplayName(bay);
+            const hull = resolveFighterBayHull(bay);
+            const used = fighterSlotsUsed(bay);
+            const systemEntries = Object.entries(bay.systems).filter(([, c]) => c > 0);
             return (
-              <li key={i} className="text-slate-200">
-                <div className="text-amber font-display text-xs tracking-wider">
-                  Bay {i + 1}: {label}
+              <li key={i} className="text-slate-200 panel p-3 bg-void/20">
+                <div className="text-amber font-display text-sm tracking-wider">
+                  {label}
                 </div>
-                {bay.weapons.length === 0 ? (
-                  <p className="text-slate-500 text-xs pl-2">Stock loadout</p>
-                ) : (
+                <p className="text-slate-500 text-[10px] mt-0.5">
+                  Bay {i + 1}
+                  {hull ? ` · ${hull.name} (${hull.subtitle})` : ''}
+                  {' · '}
+                  {used}/{FIGHTER_SLOT_COUNT} slots
+                </p>
+                {hull?.trait && (
+                  <p className="text-slate-400 text-[10px] mt-1 italic">{hull.trait}</p>
+                )}
+                {systemEntries.length > 0 && (
+                  <ul className="pl-2 mt-2 space-y-0.5">
+                    {systemEntries.map(([id, count]) => {
+                      const def = SYSTEMS_BY_ID[id];
+                      if (!def) return null;
+                      return (
+                        <li key={id} className="text-xs text-slate-300">
+                          <span className="text-cyan">▸</span> {def.name}
+                          {count > 1 && <span className="text-amber"> ×{count}</span>}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                {bay.weapons.length === 0 && systemEntries.length === 0 ? (
+                  <p className="text-slate-500 text-xs pl-2 mt-1">Stock loadout</p>
+                ) : bay.weapons.length > 0 ? (
                   <ul className="pl-2 mt-1 space-y-1">
                     {bay.weapons.map((w, wi) => {
                       const def = WEAPONS_BY_NAME[w.name];
@@ -212,7 +240,7 @@ export default function StatBlock({
                       );
                     })}
                   </ul>
-                )}
+                ) : null}
               </li>
             );
           })}

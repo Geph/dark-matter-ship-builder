@@ -139,6 +139,12 @@ body::after {
     0 0 10px rgba(56, 255, 156, 0.95),
     0 0 22px rgba(56, 255, 156, 0.45);
 }
+.glow-fuchsia {
+  color: #e879f9;
+  text-shadow:
+    0 0 10px rgba(217, 70, 239, 0.95),
+    0 0 22px rgba(217, 70, 239, 0.45);
+}
 
 /* game-icons.net SVGs for emblems */
 .game-icon {

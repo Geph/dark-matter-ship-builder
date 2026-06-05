@@ -46,6 +46,13 @@ export default function ShipIconPicker({ value, onChange }: Props) {
     );
   }, [pool, query]);
 
+  const displayed = useMemo(() => {
+    if (mode === 'all' && !query.trim()) {
+      return filtered.slice(0, 120);
+    }
+    return filtered;
+  }, [filtered, mode, query]);
+
   if (error) {
     return <p className="text-danger text-sm">{error}</p>;
   }
@@ -125,10 +132,10 @@ export default function ShipIconPicker({ value, onChange }: Props) {
         role="listbox"
         aria-label="Ship emblem icons"
       >
-        {filtered.length === 0 ? (
+        {displayed.length === 0 ? (
           <p className="col-span-full text-slate-500 text-xs text-center py-4">No icons match.</p>
         ) : (
-          filtered.map((icon) => {
+          displayed.map((icon) => {
             const selected = value === icon.id;
             return (
               <button
@@ -150,7 +157,12 @@ export default function ShipIconPicker({ value, onChange }: Props) {
       </div>
 
       <p className="text-slate-600 text-[10px] font-mono-hud">
-        Showing {filtered.length} icon{filtered.length !== 1 ? 's' : ''}
+        Showing {displayed.length} icon{displayed.length !== 1 ? 's' : ''}
+        {mode === 'all' && !query.trim() && filtered.length > displayed.length
+          ? ` (search to browse all ${filtered.length.toLocaleString()})`
+          : filtered.length !== displayed.length
+            ? ` of ${filtered.length.toLocaleString()}`
+            : ''}
       </p>
     </div>
   );
