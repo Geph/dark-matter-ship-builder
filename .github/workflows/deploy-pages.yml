@@ -47,7 +47,6 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     permissions:
-      contents: write
       pages: write
       id-token: write
     environment:
@@ -57,17 +56,3 @@ jobs:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
-
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Bump version for next deployment
-        run: node scripts/bump-version.mjs
-
-      - name: Commit version bump
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json README.md
-          git diff --staged --quiet || git commit -m "chore: bump version for next deployment [skip ci]"
-          git push

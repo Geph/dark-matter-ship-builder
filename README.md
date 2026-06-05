@@ -140,8 +140,12 @@ Game math lives in `src/lib/rules.ts`; rulebook numbers live in `src/data/*`.
 
 Pushes to `main` deploy to **GitHub Pages** via
 [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml).
-Each successful deploy bumps the patch-style version by **0.1** (footer shows
-`v0.1`, `v0.2`, …) and updates this README’s **Current release** line.
+The footer shows the version from `package.json` (e.g. `0.1.0` → **v0.1**).
+
+Because `main` is protected (PR + CI required), the deploy workflow does **not**
+commit back to the branch. When you want to publish a new release label, run
+`npm run version:bump` locally and include the updated `package.json` and
+README in your PR.
 
 In repo **Settings → Pages**, set **Source** to **GitHub Actions**.
 
