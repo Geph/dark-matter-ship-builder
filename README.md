@@ -11,12 +11,13 @@ arcs.
 
 **Live site:** https://geph.github.io/dark-matter-ship-builder/
 
-**Current release:** v0.1
+**Current release:** v0.2
 
 ![Dark Matter Ship Builder — landing page overview](docs/screenshots/overview.png)
 
 ### Changelog
 
+- **v0.2** — Ship and crew portraits, configurable print (image / stats / crew actions), contributor scaffolding, README screenshots.
 - **v0.1** — Initial public release: full ship builder, fighter builds and bays, crew actions, game-icons emblems, ship sheet, GitHub Pages deploy, and versioned releases.
 
 ## What it does
