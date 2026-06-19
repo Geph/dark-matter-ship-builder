@@ -1,25 +1,63 @@
 import { useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
+import type { Ship } from './types';
+import { CREW_ROLES_BY_ID } from '../data/crewRoles';
 
-const PRINT_CREW_CONFIRM =
-  'Include crew actions at the end of the printout?\n\n' +
-  'Choose OK to append crew actions after the ship stats and description.\n' +
-  'Choose Cancel for stats and description only.';
+export interface PrintOptions {
+  shipImage: boolean;
+  shipStats: boolean;
+  crewActions: boolean;
+}
+
+export function defaultPrintOptions(ship: Ship): PrintOptions {
+  const hasCrewActions = ship.crewRoles.some((id) => CREW_ROLES_BY_ID[id]);
+  return {
+    shipImage: !!ship.shipImageDataUrl,
+    shipStats: true,
+    crewActions: hasCrewActions,
+  };
+}
+
+export function hasPrintSelection(options: PrintOptions): boolean {
+  return options.shipImage || options.shipStats || options.crewActions;
+}
 
 export function useShipPrint() {
-  const [printWithCrewActions, setPrintWithCrewActions] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [printOptions, setPrintOptions] = useState<PrintOptions>({
+    shipImage: false,
+    shipStats: true,
+    crewActions: false,
+  });
+  const [isPrinting, setIsPrinting] = useState(false);
 
   useEffect(() => {
-    const reset = () => setPrintWithCrewActions(false);
+    const reset = () => setIsPrinting(false);
     window.addEventListener('afterprint', reset);
     return () => window.removeEventListener('afterprint', reset);
   }, []);
 
-  const requestPrint = () => {
-    const include = window.confirm(PRINT_CREW_CONFIRM);
-    flushSync(() => setPrintWithCrewActions(include));
+  const requestPrint = () => setDialogOpen(true);
+
+  const cancelPrint = () => setDialogOpen(false);
+
+  const confirmPrint = (options: PrintOptions) => {
+    if (!hasPrintSelection(options)) return;
+    setDialogOpen(false);
+    flushSync(() => {
+      setPrintOptions(options);
+      setIsPrinting(true);
+    });
     window.print();
   };
 
-  return { printWithCrewActions, requestPrint };
+  return {
+    dialogOpen,
+    setDialogOpen,
+    printOptions,
+    isPrinting,
+    requestPrint,
+    cancelPrint,
+    confirmPrint,
+  };
 }

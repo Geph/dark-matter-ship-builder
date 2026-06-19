@@ -297,4 +297,9 @@ select:focus {
     border-color: #000 !important;
     box-shadow: none !important;
   }
+  .print-ship-image-page {
+    page-break-after: always;
+    break-after: page;
+    min-height: 100vh;
+  }
 }

@@ -8,6 +8,8 @@ import { useShipPrint } from '../lib/useShipPrint';
 import StatBlock from '../components/StatBlock';
 import CrewActionTabs from '../components/CrewActionTabs';
 import CrewActionsPrint from '../components/CrewActionsPrint';
+import PrintOptionsDialog from '../components/PrintOptionsDialog';
+import ShipImagePrint from '../components/ShipImagePrint';
 
 export default function PublicShip() {
   const { token } = useParams();
@@ -15,7 +17,14 @@ export default function PublicShip() {
     token ? getShipByShareToken(token) : undefined,
   );
   const [shared, setShared] = useState(false);
-  const { printWithCrewActions, requestPrint } = useShipPrint();
+  const {
+    dialogOpen,
+    printOptions,
+    isPrinting,
+    requestPrint,
+    cancelPrint,
+    confirmPrint,
+  } = useShipPrint();
   const showShare = canShareShipLinks();
 
   const update = useCallback((mutator: (s: Ship) => Ship) => {
@@ -70,7 +79,7 @@ export default function PublicShip() {
       </div>
 
       {ship.shipImageDataUrl && (
-        <div className="mb-6 panel p-2 sm:p-3 bg-void/40">
+        <div className="no-print mb-6 panel p-2 sm:p-3 bg-void/40">
           <img
             src={ship.shipImageDataUrl}
             alt={ship.name ? `${ship.name} portrait` : 'Ship portrait'}
@@ -79,10 +88,25 @@ export default function PublicShip() {
         </div>
       )}
 
-      <div className="space-y-6">
-        <StatBlock ship={ship} hideCrewActions onUpdate={update} />
+      <PrintOptionsDialog
+        open={dialogOpen}
+        ship={ship}
+        onCancel={cancelPrint}
+        onConfirm={confirmPrint}
+      />
 
-        {printWithCrewActions && <CrewActionsPrint ship={ship} />}
+      <div className="space-y-6">
+        {isPrinting && printOptions.shipImage && <ShipImagePrint ship={ship} />}
+
+        <div
+          className={
+            isPrinting && !printOptions.shipStats ? 'print:hidden' : undefined
+          }
+        >
+          <StatBlock ship={ship} hideCrewActions onUpdate={update} />
+        </div>
+
+        {isPrinting && printOptions.crewActions && <CrewActionsPrint ship={ship} />}
 
         <div className="no-print">
           <h3 className="font-display text-xs tracking-[0.25em] text-amber mb-3">

@@ -54,7 +54,7 @@ Read-only play sheet for a saved ship (same browser registry for localStorage):
 - Accordion sections: Systems, Weapons, Upgrades, Description
 - **Crew Actions** tabbed panel with rulebook actions and roll buttons
 - Optional ship portrait
-- **Print** prompts whether to append crew actions after stats and description
+- **Print** — choose ship image (own page), ship stats, and/or crew actions
 - **Share** (copy link) only when using a **database backend** on a **public host** (see below)
 
 ![My Ships fleet dashboard](docs/screenshots/my-ships.png)

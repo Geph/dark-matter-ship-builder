@@ -7,6 +7,8 @@ import { canShareShipLinks } from '../../lib/sharing';
 import { useShipPrint } from '../../lib/useShipPrint';
 import StatBlock from '../StatBlock';
 import CrewActionsPrint from '../CrewActionsPrint';
+import PrintOptionsDialog from '../PrintOptionsDialog';
+import ShipImagePrint from '../ShipImagePrint';
 import ShipImageUpload from '../ShipImageUpload';
 
 interface Props {
@@ -19,7 +21,14 @@ interface Props {
 export default function StepName({ ship, update, onSave, savedAt }: Props) {
   const [christened, setChristened] = useState(false);
   const [copied, setCopied] = useState(false);
-  const { printWithCrewActions, requestPrint } = useShipPrint();
+  const {
+    dialogOpen,
+    printOptions,
+    isPrinting,
+    requestPrint,
+    cancelPrint,
+    confirmPrint,
+  } = useShipPrint();
   const showShare = canShareShipLinks();
 
   const christen = () => {
@@ -119,9 +128,22 @@ export default function StepName({ ship, update, onSave, savedAt }: Props) {
         )}
       </div>
 
+      <PrintOptionsDialog
+        open={dialogOpen}
+        ship={ship}
+        onCancel={cancelPrint}
+        onConfirm={confirmPrint}
+      />
+
       {/* Final stat card preview */}
-      <StatBlock ship={ship} showCombat crewActionsNoPrint />
-      {printWithCrewActions && <CrewActionsPrint ship={ship} />}
+      {isPrinting && printOptions.shipImage && <ShipImagePrint ship={ship} />}
+
+      <div
+        className={isPrinting && !printOptions.shipStats ? 'print:hidden' : undefined}
+      >
+        <StatBlock ship={ship} showCombat crewActionsNoPrint />
+      </div>
+      {isPrinting && printOptions.crewActions && <CrewActionsPrint ship={ship} />}
     </div>
   );
 }
