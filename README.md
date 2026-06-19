@@ -230,7 +230,24 @@ To persist ships across devices and enable **Share** on a public deployment:
 - Vite 8 + TypeScript
 - Tailwind CSS 4
 
+## Known issues / Roadmap
+
+Open an [issue](https://github.com/Geph/dark-matter-ship-builder/issues) for bugs
+or feature ideas — use the templates when they fit. Roadmap items will be
+tracked there as the project grows.
+
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup,
+lint/build checks, branch naming, and PR expectations. Please read the
+[Code of Conduct](CODE_OF_CONDUCT.md) before participating.
+
 ## Credits
+
+Application source code is licensed under the [MIT License](LICENSE). That
+license covers this repository's software only — it does **not** apply to
+*Dark Matter Sci-Fi 5E* game content (© Mage Hand Press) or
+[game-icons.net](https://game-icons.net/) assets (CC BY 3.0).
 
 Game content © Mage Hand Press, *Dark Matter Sci-Fi 5E*. Ship and UI icons from
 [game-icons.net](https://game-icons.net/) (CC BY 3.0), including Delapouite’s
