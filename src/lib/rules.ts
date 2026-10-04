@@ -10,10 +10,11 @@ import { SYSTEMS_BY_ID, HULL_EMBEDDED_SYSTEM_IDS, type SystemDef } from '../data
 import { UPGRADES_BY_ID, DM_ENGINE_COSTS, type UpgradeDef } from '../data/upgrades';
 import { WEAPONS_BY_NAME, type WeaponDef } from '../data/weapons';
 import { CREW_ROLES_BY_ID, STARTING_SYSTEM_IDS } from '../data/crewRoles';
+import { MEGA_SPELLS_BY_ID } from '../data/megaSpells';
 
 /** Starting systems granted free on a standard hull vs. a fighter build. */
 export function startingSystemIds(ship: Ship): string[] {
-  if (ship.isFighterBuild) return ['life-support', 'sensors'];
+  if (ship.isFighterBuild) return []; // GM custom hull: buy its stock systems, not level-table grants.
   return STARTING_SYSTEM_IDS;
 }
 
@@ -28,12 +29,10 @@ export function customFighterMhp(ship: Ship): number {
   return Math.max(minimumCustomFighterMhp(ship.level), hull?.mhp ?? 25);
 }
 
-const FIGHTER_BANNED_WEAPON_NAMES = new Set(['Railgun']);
-
 /** Weapons that cannot be mounted on fighter-class hulls. */
 export function canEquipWeaponOnFighterClass(def: WeaponDef): PrereqResult {
-  if (FIGHTER_BANNED_WEAPON_NAMES.has(def.name)) {
-    return { ok: false, reason: 'Railguns cannot be mounted on fighter-class ships.' };
+  if (def.catalogOnly || def.frameWeapon) {
+    return { ok: false, reason: 'This is not a purchasable ship weapon (pp. 211, 225).' };
   }
   return { ok: true };
 }
@@ -101,7 +100,7 @@ export function fighterBayLoadoutBillableCost(bay: FighterBaySlot): number {
   const stockWeapons = [...stock.weapons];
   for (const w of bay.weapons) {
     const matchIdx = stockWeapons.findIndex(
-      (s) => s.name === w.name && s.facing === w.facing,
+      (s) => s.name === w.name,
     );
     if (matchIdx >= 0) {
       stockWeapons.splice(matchIdx, 1);
@@ -142,7 +141,7 @@ export function grantedSystemCounts(ship: Ship): Record<string, number> {
  * crew roles change so auto-added systems appear in the loadout.
  */
 /** Systems that must be manually installed — never auto-granted. */
-export const NEVER_AUTO_INSTALL_IDS = ['escape-pod-fighter', 'fighter-bay'];
+export const NEVER_AUTO_INSTALL_IDS = ['escape-pod-fighter'];
 
 export function withGrantedSystems(ship: Ship): Record<string, number> {
   const granted = grantedSystemCounts(ship);
@@ -163,7 +162,7 @@ export function effectiveDmClass(ship: Ship): number {
 
 /**
  * Total credits spent: systems (× count) + weapons + upgrades +
- * the cumulative cost of upgrading the Dark Matter engine.
+ * the price of the selected replacement Dark Matter engine.
  */
 export function computeCreditsSpent(ship: Ship): number {
   let total = 0;
@@ -203,11 +202,24 @@ export function computeCreditsSpent(ship: Ship): number {
 /** Hardpoint slots used on a deployed fighter (systems + weapons). */
 export function fighterSlotsUsed(bay: FighterBaySlot): number {
   const systemSlots = Object.values(bay.systems).reduce((a, b) => a + b, 0);
-  return systemSlots + bay.weapons.length;
+  return systemSlots + bay.weapons.filter((w) => !WEAPONS_BY_NAME[w.name]?.frameWeapon).length;
+}
+
+export function fighterSlotCapacity(bay: FighterBaySlot): number {
+  return resolveFighterBayHull(bay)?.slots ?? FIGHTER_SLOT_COUNT;
+}
+
+export function fighterBayMhp(bay: FighterBaySlot): number {
+  const base = resolveFighterBayHull(bay)?.mhp ?? 0;
+  return bay.pilotLevel ? Math.max(base, 5 * bay.pilotLevel) : base;
+}
+
+export function fighterBayShieldPoints(bay: FighterBaySlot): number {
+  return resolveFighterBayHull(bay)?.shieldPoints ?? ((bay.systems['shield-generator'] ?? 0) > 0 ? 4 : 0);
 }
 
 export function fighterSlotsRemaining(bay: FighterBaySlot): number {
-  return FIGHTER_SLOT_COUNT - fighterSlotsUsed(bay);
+  return fighterSlotCapacity(bay) - fighterSlotsUsed(bay);
 }
 
 /** Can this system be installed on a deployed fighter bay? */
@@ -238,19 +250,14 @@ export function canInstallFighterSystem(bay: FighterBaySlot, def: SystemDef): Pr
 }
 
 /**
- * Cumulative cost of upgrading the engine from the base class
- * (set by level) up to the chosen class. Each intermediate class
- * is purchased in turn per the Dark Matter Engine Upgrade table.
+ * Purchase the replacement engine at its listed price (p. 219).
+ * Intermediate engine classes are not purchased during build planning.
  */
 export function dmEngineUpgradeCost(ship: Ship): number {
   if (ship.isFighterBuild) return 0;
   const base = statsForLevel(ship.level).dmClass;
   if (ship.upgradedDmClass == null || ship.upgradedDmClass <= base) return 0;
-  let cost = 0;
-  for (let c = base + 1; c <= ship.upgradedDmClass; c++) {
-    cost += DM_ENGINE_COSTS[c] ?? 0;
-  }
-  return cost;
+  return DM_ENGINE_COSTS[ship.upgradedDmClass] ?? 0;
 }
 
 /** Slots used: 1 per system instance + 1 per weapon. Upgrades cost 0. */
@@ -259,14 +266,12 @@ export function slotsUsed(ship: Ship): number {
   return systemSlots + ship.weapons.length;
 }
 
-/** Shield Points from an installed Shield Generator, by size (p.219). */
+/** Created ships use the level table (p. 218); fighters use p. 209. */
 export function computeShieldPoints(ship: Ship): number {
   const hasGenerator = (ship.systems['shield-generator'] ?? 0) > 0;
-  if (!hasGenerator) return 0;
-  let sp = SHIELD_POINTS_BY_SIZE[ship.size] ?? 0;
-  // Expanded Shielding upgrade doubles shield capacity (rulebook upgrade).
-  if (ship.upgrades.includes('expanded-shielding')) sp *= 2;
-  return sp;
+  if (!hasGenerator) return ship.isFighterBuild ? (fighterHullById(ship.fighterHullId)?.shieldPoints ?? 0) : 0;
+  if (!ship.isFighterBuild) return statsForLevel(ship.level).sp;
+  return fighterHullById(ship.fighterHullId)?.shieldPoints ?? SHIELD_POINTS_BY_SIZE.Fighter;
 }
 
 /** Max installs allowed for a system on a given ship size. */
@@ -311,8 +316,8 @@ export function canInstallUpgrade(ship: Ship, def: UpgradeDef): PrereqResult {
   if (def.minDmClass != null && effectiveDmClass(ship) < def.minDmClass) {
     return { ok: false, reason: `Requires Dark Matter Engine Class ${def.minDmClass}+.` };
   }
-  if (ship.upgrades.includes(def.id)) {
-    return { ok: false, reason: 'Already installed.' };
+  if (ship.upgrades.filter((id) => id === def.id).length >= (def.maxInstalls ?? 1)) {
+    return { ok: false, reason: `Maximum of ${def.maxInstalls ?? 1} installed.` };
   }
   return { ok: true };
 }
@@ -327,8 +332,31 @@ export function validateShip(ship: Ship): string[] {
   const spent = computeCreditsSpent(ship);
   const used = slotsUsed(ship);
 
+  for (const [id, count] of Object.entries(grantedSystemCounts(ship))) {
+    if ((ship.systems[id] ?? 0) < count) errors.push(`Missing required system: ${SYSTEMS_BY_ID[id]?.name ?? id}.`);
+  }
+  if (ship.crewRoles.length > ship.players) errors.push('Assigned crew roles exceed the number of players.');
+  for (const id of ship.crewRoles) {
+    const role = CREW_ROLES_BY_ID[id];
+    if (!role) errors.push(`Unknown crew role: ${id}.`);
+    else if (role.minLevel && ship.level < role.minLevel) errors.push(`${role.label} requires level ${role.minLevel}+.`);
+  }
+  for (const member of Object.values(ship.crewMembers ?? {})) {
+    for (const id of member.megaSpells ?? []) {
+      if (!MEGA_SPELLS_BY_ID[id]) errors.push(`Unverified legacy spell: ${id}. Check its rules with your GM or select a current Mega spell.`);
+    }
+  }
+  if (ship.upgradedDmClass != null && (!Number.isInteger(ship.upgradedDmClass) || ship.upgradedDmClass < 1 || ship.upgradedDmClass > 9)) {
+    errors.push('Dark Matter engine class must be an integer from 1 to 9.');
+  }
+  if (ship.isFighterBuild) {
+    const hull = fighterHullById(ship.fighterHullId);
+    if (!hull) errors.push('This legacy fighter hull is not in the current rulebook catalog. Select a supported hull.');
+    else if (hull.npcOnly || hull.gmOnly) errors.push('This hull is not supported as a player custom fighter; use its rulebook NPC or Battleframe rules.');
+  }
+
   // Rule 1: every ship needs helm control. Fighter bays are optional.
-  if (!ship.isFighterBuild) {
+  {
     const pilots = ship.systems['pilots-seat'] ?? 0;
     if (pilots < 1) {
       errors.push("Every ship needs at least one Pilot's Seat.");
@@ -350,9 +378,10 @@ export function validateShip(ship: Ship): string[] {
 
   // Rules 2,6,7,8,9: per-system size & repeat caps.
   for (const [id, count] of Object.entries(ship.systems)) {
-    if (count <= 0) continue;
+    if (count === 0) continue;
     const def = SYSTEMS_BY_ID[id];
-    if (!def) continue;
+    if (!def) { errors.push(`Unknown system: ${id}.`); continue; }
+    if (!Number.isInteger(count) || count < 0) errors.push(`${def.name}: count must be a nonnegative integer.`);
     if (def.minSize && sizeRank(ship.size) < sizeRank(def.minSize)) {
       errors.push(`${def.name} requires ${def.minSize} size or larger.`);
     }
@@ -365,7 +394,8 @@ export function validateShip(ship: Ship): string[] {
   // Rule 3: upgrade Dark Matter class & size prereqs.
   for (const id of ship.upgrades) {
     const def = UPGRADES_BY_ID[id];
-    if (!def) continue;
+    if (!def) { errors.push(`Unknown upgrade: ${id}.`); continue; }
+    if (ship.upgrades.filter((u) => u === id).length > (def.maxInstalls ?? 1)) errors.push(`${def.name}: maximum ${def.maxInstalls ?? 1} installs.`);
     if (def.minSize && sizeRank(ship.size) < sizeRank(def.minSize)) {
       errors.push(`${def.name} requires ${def.minSize} size or larger.`);
     }
@@ -387,7 +417,8 @@ export function validateShip(ship: Ship): string[] {
   // Weapon mount rules: Fixed → arc facings only; non-Fixed → turret only.
   for (const w of ship.weapons) {
     const def = WEAPONS_BY_NAME[w.name];
-    if (!def) continue;
+    if (!def) { errors.push(`Unknown weapon: ${w.name}.`); continue; }
+    if (def.catalogOnly || def.frameWeapon) errors.push(`${def.name} is not a purchasable ship weapon.`);
     const mount = canMountWeapon(def, w.facing);
     if (!mount.ok) {
       errors.push(`${def.name} [${w.facing}]: ${mount.reason}`);
@@ -404,9 +435,13 @@ export function validateShip(ship: Ship): string[] {
   fighterSlots.forEach((bay, i) => {
     if (bay.type === 'none') return;
     const label = bay.displayName?.trim() || `Fighter ${i + 1}`;
+    const hull = resolveFighterBayHull(bay);
+    if (!hull) errors.push(`${label}: unknown or unsupported fighter hull.`);
+    if (bay.pilotLevel != null && (!Number.isInteger(bay.pilotLevel) || bay.pilotLevel < 1 || bay.pilotLevel > 20)) errors.push(`${label}: pilot level must be 1–20.`);
+    if (!hull?.gmOnly && !(bay.systems['pilots-seat'] > 0)) errors.push(`${label}: requires a Pilot's Seat.`);
     const used = fighterSlotsUsed(bay);
-    if (used > FIGHTER_SLOT_COUNT) {
-      errors.push(`${label}: over fighter slot capacity (${used}/${FIGHTER_SLOT_COUNT}).`);
+    if (used > fighterSlotCapacity(bay)) {
+      errors.push(`${label}: over fighter slot capacity (${used}/${fighterSlotCapacity(bay)}).`);
     }
     for (const [id, count] of Object.entries(bay.systems)) {
       if (count <= 0) continue;
@@ -417,7 +452,8 @@ export function validateShip(ship: Ship): string[] {
         continue;
       }
       const def = SYSTEMS_BY_ID[id];
-      if (!def) continue;
+      if (!def) { errors.push(`${label}: unknown system ${id}.`); continue; }
+      if (def.minSize && sizeRank('Fighter') < sizeRank(def.minSize)) errors.push(`${label} — ${def.name} requires ${def.minSize} size or larger.`);
       const max = maxInstallsForSystem(def, 'Fighter');
       if (count > max) {
         errors.push(`${label} — ${def.name}: ${count} installed but max is ${max}.`);
@@ -425,7 +461,8 @@ export function validateShip(ship: Ship): string[] {
     }
     for (const w of bay.weapons) {
       const def = WEAPONS_BY_NAME[w.name];
-      if (!def) continue;
+      if (!def) { errors.push(`${label}: unknown weapon ${w.name}.`); continue; }
+      if (def.frameWeapon && bay.catalogId === 'battle-frame') continue;
       const mount = canMountWeapon(def, w.facing);
       if (!mount.ok) {
         errors.push(`${label} — ${def.name} [${w.facing}]: ${mount.reason}`);
@@ -476,10 +513,7 @@ export function isHullEmbeddedSystem(systemId: string): boolean {
 
 /** Attack bonus from the Gunner crew member, or a level-derived default. */
 export function gunnerAttackBonus(ship: Ship): number {
-  const gunner = ship.crewMembers?.['gunner'];
-  if (gunner && gunner.attackBonus !== 0) return gunner.attackBonus;
-  if (gunner?.skillModifier) return gunner.skillModifier + 2;
-  return Math.max(2, Math.floor(ship.level / 4) + 2);
+  return ship.crewMembers?.gunner?.attackBonus ?? 0;
 }
 
 /** Slots still available on the ship. May be negative if over capacity. */
@@ -524,7 +558,7 @@ export function addWeapon(
   facing: WeaponFacing = 'Forward',
 ): Ship {
   const def = WEAPONS_BY_NAME[name];
-  if (!def) return { ...ship, weapons: [...ship.weapons, { name, facing }] };
+  if (!def || def.catalogOnly || def.frameWeapon) return ship;
   if (ship.isFighterBuild) {
     const fighterCheck = canEquipWeaponOnFighterClass(def);
     if (!fighterCheck.ok) return ship;
@@ -627,7 +661,8 @@ export function setFighterBuildHull(ship: Ship, hullId: string): Ship {
   return {
     ...ship,
     fighterHullId: hullId,
-    weapons: hull ? [...hull.defaultWeapons] : ship.weapons,
+    systems: hull ? { ...hull.defaultSystems } : ship.systems,
+    weapons: hull ? hull.defaultWeapons.map((w) => ({ ...w })) : ship.weapons,
   };
 }
 

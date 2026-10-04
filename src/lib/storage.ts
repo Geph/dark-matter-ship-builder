@@ -1,5 +1,7 @@
 import type { FighterBaySlot, Ship } from './types';
+import { validateImportedShips } from './importValidation';
 import { statsForLevel } from '../data/shipStats';
+import { STARTING_SYSTEM_IDS } from '../data/crewRoles';
 import { fighterHullById, FIGHTER_SLOT_COUNT, normalizeFighterBayType } from '../data/fighters';
 import {
   computeCreditsSpent,
@@ -49,7 +51,7 @@ export function emptyShip(): Ship {
     mhp: base.mhp,
     mhpCurrent: null,
     ac: base.ac,
-    shieldPoints: 0,
+    shieldPoints: base.sp,
     shieldCurrent: null,
     speed: base.speed,
     maneuverability: base.maneuverability,
@@ -59,7 +61,7 @@ export function emptyShip(): Ship {
     dimensionsOverride: null,
     crewRoles: [],
     crewMembers: {},
-    systems: {},
+    systems: Object.fromEntries(STARTING_SYSTEM_IDS.map((id) => [id, 1])),
     weapons: [],
     fighterBays: [],
     creditBudgetOverride: null,
@@ -95,9 +97,9 @@ export function recomputeShip(ship: Ship): Ship {
       ac: hull?.ac ?? 13,
       speed: hull?.speed ?? 3500,
       maneuverability: hull?.maneuverability ?? 180,
-      totalSlots: FIGHTER_SLOT_COUNT,
-      cargo: 0,
-      passengers: 1,
+      totalSlots: hull?.slots ?? FIGHTER_SLOT_COUNT,
+      cargo: hull?.cargo ?? 0,
+      passengers: hull?.passengers ?? 0,
       upgradedDmClass: null,
       fighterHullId: ship.fighterHullId ?? 'sabre',
     };
@@ -119,6 +121,8 @@ export function recomputeShip(ship: Ship): Ship {
       passengers: base.passengers,
     };
   }
+  if (next.upgrades.includes('expanded-hold')) next.cargo *= 2;
+  if (next.upgrades.includes('expanded-quarters')) next.passengers *= 2;
   next.fighterBays = syncFighterBays(next);
   next.shieldPoints = computeShieldPoints(next);
   if (next.mhpCurrent != null) {
@@ -155,18 +159,21 @@ function normalizeShip(ship: Ship & { megaSpells?: string[] }): Ship {
       name: member.name ?? '',
       skillModifier: member.skillModifier ?? 0,
       attackBonus: member.attackBonus ?? 0,
+      abilityModifier: member.abilityModifier ?? 0,
+      damageModifier: member.damageModifier ?? 0,
       megaSpells: member.megaSpells ?? [],
       imageDataUrl: member.imageDataUrl ?? null,
     };
   }
-  const { megaSpells: _legacy, ...rest } = ship;
+  const rest = { ...ship };
+  delete rest.megaSpells;
   const systems = { ...(rest.systems ?? {}) };
-  let weapons = [...(rest.weapons ?? [])];
+  const weapons = [...(rest.weapons ?? [])];
   if (rest.isFighterBuild) {
     delete systems['escape-pods'];
-    weapons = weapons.filter((w) => w.name !== 'Railgun');
+
   }
-  return {
+  return recomputeShip({
     ...rest,
     systems,
     crewMembers,
@@ -179,7 +186,6 @@ function normalizeShip(ship: Ship & { megaSpells?: string[] }): Ship {
       return {
         ...normalized,
         weapons: normalized.weapons
-          .filter((w) => w.name !== 'Railgun')
           .map((w) => ({
             ...w,
             name: fixWeaponName(w.name),
@@ -196,7 +202,7 @@ function normalizeShip(ship: Ship & { megaSpells?: string[] }): Ship {
     shieldCurrent: rest.shieldCurrent ?? null,
     isFighterBuild: rest.isFighterBuild ?? false,
     fighterHullId: rest.fighterHullId ?? null,
-  };
+  });
 }
 
 function readAll(): Ship[] {
@@ -246,16 +252,14 @@ export function deleteShip(id: string): void {
  */
 export function importShips(rawShips: unknown[]): number {
   if (rawShips.length === 0) return 0;
+  validateImportedShips(rawShips);
 
   const now = new Date().toISOString();
-  const idMap = new Map<string, string>();
   const staged: Ship[] = [];
 
   for (const raw of rawShips) {
     const normalized = normalizeShip(raw as Ship & { megaSpells?: string[] });
-    const oldId = normalized.id || uuid();
     const newId = uuid();
-    idMap.set(oldId, newId);
     staged.push({
       ...normalized,
       id: newId,
@@ -265,9 +269,8 @@ export function importShips(rawShips: unknown[]): number {
     });
   }
 
-  for (const ship of staged) {
-    saveShip(ship);
-  }
+  // One write prevents a partially imported fleet if storage quota is exceeded.
+  writeAll([...readAll(), ...staged.map(recomputeShip)]);
 
   return staged.length;
 }

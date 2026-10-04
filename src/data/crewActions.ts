@@ -1,312 +1,80 @@
 import type { ShipSize } from '../lib/types';
 import { sizeRank } from './shipStats';
 
-// ============================================================
-// Crew role actions (Dark Matter Sci-Fi 5E, pp. 220–222).
-// ============================================================
-
-export type CrewActionType =
-  | 'skillCheck'
-  | 'contestedCheck'
-  | 'diceRoll'
-  | 'attackDisadvantage'
-  | 'description';
-
+/** Player actions from the March 2026 book, printed pp. 208–224. */
+export type CrewActionType = 'skillCheck' | 'contestedCheck' | 'diceRoll' | 'attackDisadvantage' | 'description';
 export interface CrewActionDef {
-  id: string;
-  roleId: string;
-  name: string;
-  description: string;
-  type: CrewActionType;
-  /** Skill label shown on roll buttons, e.g. "Dex (Piloting)". */
-  skillLabel?: string;
-  /** Fixed DC when the rulebook specifies one. */
-  dc?: number;
-  /** Dice notation for simple rolls (e.g. Brace for Impact 1d6). */
-  dice?: string;
-  /** Minimum ship size (inclusive). */
-  minSize?: ShipSize;
-  /** Maximum ship size (inclusive). */
-  maxSize?: ShipSize;
-  /** Required installed system id. */
-  requiresSystem?: string;
+  id: string; roleId: string; name: string; description: string; type: CrewActionType;
+  skillLabel?: string; dc?: number; dice?: string;
+  minSize?: ShipSize; maxSize?: ShipSize; requiresSystem?: string; requiresEngine?: boolean;
   source: string;
 }
 
-export const CREW_ACTIONS: CrewActionDef[] = [
-  // —— Captain (pp. 220–221) ——
-  {
-    id: 'captain-initiative',
-    roleId: 'captain',
-    name: 'Roll Ship Initiative',
-    description:
-      'When you take the Captain role at initiative, roll once for the entire crew. The party acts on that turn while you remain captain.',
-    type: 'description',
-    source: 'Captain',
-  },
-  {
-    id: 'captain-boarding',
-    roleId: 'captain',
-    name: 'Boarding Party',
-    description:
-      'When boarding conditions are met, use your action to form a boarding party (you may join) and deploy the umbilicus.',
-    type: 'description',
-    source: 'Captain',
-  },
-  {
-    id: 'captain-brace',
-    roleId: 'captain',
-    name: 'Brace for Impact',
-    description:
-      'Use your action to brace the ship. Before your next turn, each time the ship takes damage you may roll 1d6 and subtract it from mega damage taken (minimum 1).',
-    type: 'diceRoll',
-    dice: '1d6',
-    source: 'Captain',
-  },
-  {
-    id: 'captain-deep-scan',
-    roleId: 'captain',
-    name: 'Deep Scan',
-    description:
-      'With sensors installed, use your action to deep-scan an object within sensor range and make an Intelligence (Investigation) check to examine it.',
-    type: 'skillCheck',
-    skillLabel: 'Int (Investigation)',
-    requiresSystem: 'sensors',
-    source: 'Captain',
-  },
-  {
-    id: 'captain-fire-at-will',
-    roleId: 'captain',
-    name: 'Fire at Will',
-    description:
-      'Use your action to declare a barrage. One gunner you choose can use its reaction to make one attack with a ship weapon.',
-    type: 'description',
-    source: 'Captain',
-  },
-  {
-    id: 'captain-full-speed',
-    roleId: 'captain',
-    name: 'Full Speed Ahead',
-    description:
-      'Use your action to push the engines. The pilot can use its reaction to move the ship half its movement within the cone of movement.',
-    type: 'description',
-    source: 'Captain',
-  },
-
-  // —— Pilot (pp. 221–222) ——
-  {
-    id: 'pilot-move',
-    roleId: 'pilot',
-    name: 'Move',
-    description:
-      'Use your action to move the ship up to its speed within the cone of movement, then rotate facing by up to the ship\'s maneuverability.',
-    type: 'description',
-    source: 'Pilot',
-  },
-  {
-    id: 'pilot-evasive',
-    roleId: 'pilot',
-    name: 'Evasive Maneuvers',
-    description:
-      'Corvette-sized or smaller only. Use your action instead of moving normally. Until your next turn, add your Dexterity modifier to the ship\'s AC and gain advantage on Dexterity saves made for the ship.',
-    type: 'description',
-    maxSize: 'Corvette',
-    source: 'Pilot',
-  },
-  {
-    id: 'pilot-dogfighting',
-    roleId: 'pilot',
-    name: 'Dogfighting',
-    description:
-      'Corvette-sized or smaller only. If a same-size ship is behind you within 1,000 ft, use your action to make a contested Dexterity (Piloting) check. On a success, you switch places; facing stays the same.',
-    type: 'contestedCheck',
-    skillLabel: 'Dex (Piloting)',
-    maxSize: 'Corvette',
-    source: 'Pilot',
-  },
-  {
-    id: 'pilot-hard-turn',
-    roleId: 'pilot',
-    name: 'Hard Turn',
-    description:
-      'Corvette-sized or smaller only. Use your action to move 500 feet in any direction and rotate to face any direction.',
-    type: 'description',
-    maxSize: 'Corvette',
-    source: 'Pilot',
-  },
-  {
-    id: 'pilot-match-speed',
-    roleId: 'pilot',
-    name: 'Match Speed',
-    description:
-      'Use your action to match another visible ship\'s rate and heading until your next turn, maintaining distance and angle. Ends if the target outruns you or uses Hard Turn.',
-    type: 'description',
-    source: 'Pilot',
-  },
-  {
-    id: 'pilot-ram',
-    roleId: 'pilot',
-    name: 'Ram',
-    description:
-      'Frigate-sized or smaller. Move up to speed into an enemy ship or mega creature\'s space. Both take mega bludgeoning damage: 2d10 (Fighter/Personal), 3d10 (Transport), 4d10 (Corvette/Frigate).',
-    type: 'diceRoll',
-    dice: '2d10',
-    maxSize: 'Frigate',
-    source: 'Pilot',
-  },
-
-  // —— Gunner (pp. 221) ——
-  {
-    id: 'gunner-open-fire',
-    roleId: 'gunner',
-    name: 'Open Fire',
-    description:
-      'Take the Attack action to fire one ship weapon. Extra Attack and similar features grant additional attacks with that weapon.',
-    type: 'description',
-    source: 'Gunner',
-  },
-  {
-    id: 'gunner-readied',
-    roleId: 'gunner',
-    name: 'Readied Attacks',
-    description:
-      'Use your action to ready a ship weapon attack, such as intercepting torpedoes the moment they launch.',
-    type: 'description',
-    source: 'Gunner',
-  },
-  {
-    id: 'gunner-switch-weapon',
-    roleId: 'gunner',
-    name: 'Switch Weapons',
-    description:
-      'Use a bonus action on your turn to switch which ship weapon you are operating. You may only fire one weapon at a time.',
-    type: 'description',
-    source: 'Gunner',
-  },
-
-  // —— Engineer (pp. 221–222) ——
-  {
-    id: 'engineer-switch-shield',
-    roleId: 'engineer',
-    name: 'Switch Shield Facing',
-    description:
-      'Use a bonus action to rotate the directional shield to another side of the ship. Shields cover one side by default.',
-    type: 'description',
-    requiresSystem: 'shield-generator',
-    source: 'Engineer',
-  },
-  {
-    id: 'engineer-direct-power',
-    roleId: 'engineer',
-    name: 'Directing Power',
-    description:
-      'Use your action to deactivate shields and route power to engines (+half speed until next turn) or a weapon (gunners gain one extra attack with that weapon on Open Fire). Or draw power from weapons to strengthen shields (two consecutive sides covered, full shield recharge, but gunners lose one attack).',
-    type: 'description',
-    requiresSystem: 'shield-generator',
-    source: 'Engineer',
-  },
-  {
-    id: 'engineer-overcharge',
-    roleId: 'engineer',
-    name: 'Overcharge Engine',
-    description:
-      'Spellcaster only. Expend a spell slot ≥ the Dark Matter engine class to overcharge: shields fully recharge, speed increases by half, and each gunner gains one extra weapon attack until your next turn. Once per minute.',
-    type: 'description',
-    source: 'Engineer',
-  },
-  {
-    id: 'engineer-repair',
-    roleId: 'engineer',
-    name: 'System Repair',
-    description:
-      'Use your action to repair a deactivated system or weapon at 0 MHP. DC 15 Intelligence (Technology) check; on success it regains 1 MHP and reactivates at the start of your next turn.',
-    type: 'skillCheck',
-    skillLabel: 'Int (Technology)',
-    dc: 15,
-    source: 'Engineer',
-  },
-  {
-    id: 'engineer-void-jump',
-    roleId: 'engineer',
-    name: 'Void Jump',
-    description:
-      'Begin charging a void jump. After 1 minute the ship jumps; the pilot rolls on the Jump Navigation table when the jump begins.',
-    type: 'description',
-    source: 'Engineer',
-  },
-
-  // —— Pilot (Fighter Bay) / Dogfighter (pp. 220–221) ——
-  {
-    id: 'dogfighter-launch',
-    roleId: 'pilot-fighter',
-    name: 'Launch / Dock Fighter',
-    description:
-      'Use your action to launch your fighter from the bay or dock while adjacent to the mothership. You may only switch roles while docked.',
-    type: 'description',
-    requiresSystem: 'fighter-bay',
-    source: 'Dogfighter',
-  },
-  {
-    id: 'dogfighter-move-fire',
-    roleId: 'pilot-fighter',
-    name: 'Fighter Movement & Fire',
-    description:
-      'While deployed, move your fighter its full speed without spending an action and use your action to fire its weapons (as Gunner Open Fire / Pilot Move rules).',
-    type: 'description',
-    source: 'Dogfighter',
-  },
-  {
-    id: 'dogfighter-targeted',
-    roleId: 'pilot-fighter',
-    name: 'Targeted Attack',
-    description:
-      'Within 1,000 ft of another ship, use your action to attack with disadvantage to disable a system, weapon, or impulse engines (10 MHP each). Shielded hits deduct from shield points first.',
-    type: 'attackDisadvantage',
-    skillLabel: 'Attack',
-    source: 'Dogfighter',
-  },
-  {
-    id: 'dogfighter-eject',
-    roleId: 'pilot-fighter',
-    name: 'Eject',
-    description:
-      'If your fighter is destroyed, use your reaction to eject in a life pod.',
-    type: 'description',
-    source: 'Dogfighter',
-  },
+const PILOT_ACTIONS: CrewActionDef[] = [
+  { id: 'pilot-move-fire', roleId: 'pilot', name: 'Move and Fire', type: 'description', source: 'p. 221',
+    description: 'Action: move up to Speed within the movement cone and take the Attack action, then rotate by up to Maneuverability. On Personal or larger ships, make only one attack, using a Melee or Fixed weapon. Fighters can use their normal Attack action, including applicable Extra Attack.' },
+  { id: 'pilot-evasive', roleId: 'pilot', name: 'Evasive Maneuvers', type: 'skillCheck', skillLabel: 'Dexterity (Piloting)', dc: 15, source: 'p. 221',
+    description: 'Action: move 500 feet in any direction and face any direction. On a DC 15 Dexterity (Piloting) success, attacks against the ship have Disadvantage and its Pilot has Advantage on Dexterity saves for the ship until the next turn. No size restriction.' },
+  { id: 'pilot-targeted', roleId: 'pilot', name: 'Targeted Strike', type: 'description', maxSize: 'Fighter', source: 'p. 221',
+    description: 'Fighter only. Action: move up to half Speed within the movement cone and make one weapon attack. If it hits and deals damage through the shields, disable one system of your choice. This action does not itself impose Disadvantage.' },
+  { id: 'pilot-void-jump', roleId: 'pilot', name: 'Void Jump', type: 'description', requiresEngine: true, source: 'pp. 221, 233',
+    description: 'Action: begin a one-minute jump charge that cannot be stopped. The Pilot chooses the destination and navigation method. Engines normally allow two jumps per day, plus at most two recharges using appropriate spell slots or Hypercapacitors.' },
+  { id: 'pilot-boarding', roleId: 'pilot', name: 'Board Another Ship', type: 'description', source: 'p. 223',
+    description: 'Utilize action: when within 500 feet, connect the docking mechanism to let a party board the other ship.' },
 ];
 
-export const CREW_ACTIONS_BY_ROLE: Record<string, CrewActionDef[]> = CREW_ROLES_GROUP();
+export const CREW_ACTIONS: CrewActionDef[] = [
+  { id: 'captain-initiative', roleId: 'captain', name: 'Ship Initiative', type: 'description', source: 'p. 222',
+    description: 'At combat start, the Captain rolls ship Initiative. On its turn, the Captain chooses the turn order of crew members, including deployed fighter crew. Characters without a Crew Role roll separately.' },
+  { id: 'captain-fire-at-will', roleId: 'captain', name: 'Fire at Will', type: 'description', source: 'p. 220',
+    description: 'Action: direct one Gunner to spend a Reaction making one ship-weapon attack.' },
+  { id: 'captain-full-power-shields', roleId: 'captain', name: 'Full Power to Shields', type: 'description', requiresSystem: 'shield-generator', source: 'p. 220',
+    description: 'Action: restore all of the ship’s Shield Points.' },
+  { id: 'captain-full-speed', roleId: 'captain', name: 'Full Speed Ahead', type: 'description', source: 'p. 220',
+    description: 'Action: direct one Pilot to spend a Reaction moving the ship up to half Speed within its movement cone.' },
+  { id: 'engineer-switch-shield', roleId: 'engineer', name: 'Move Shield', type: 'description', requiresSystem: 'shield-generator', source: 'pp. 214, 220',
+    description: 'Bonus Action: change the shield facing. It covers one side, or two adjacent sides with Expanded Shielding.' },
+  { id: 'engineer-emergency-repairs', roleId: 'engineer', name: 'Emergency Repairs', type: 'skillCheck', skillLabel: 'Strength (Athletics) or Intelligence (Technology)', dc: 15, source: 'p. 220',
+    description: 'Action: DC 15 Strength (Athletics) or Intelligence (Technology). On success, restore a number of d6 Mega Hit Points equal to half your character level, rounded down (minimum 1d6), plus the Strength or Intelligence ability modifier used for the check. Do not add proficiency to healing.' },
+  { id: 'engineer-use-system', roleId: 'engineer', name: 'Use System', type: 'description', source: 'p. 220',
+    description: 'Action: activate an installed system whose description calls for Use System. Apply that system’s ranges, checks, saves, and charges.' },
+  { id: 'engineer-repair', roleId: 'engineer', name: 'Repair Disabled System', type: 'skillCheck', skillLabel: 'Intelligence (Technology)', dc: 15, source: 'p. 224',
+    description: 'Any character can take a Utilize action to try a DC 15 Intelligence (Technology) check. Success immediately re-enables one disabled system; no separate system HP or next-turn delay.' },
+  { id: 'engineer-deep-scan', roleId: 'engineer', name: 'Deep Scan', type: 'skillCheck', skillLabel: 'Intelligence (Investigation)', requiresSystem: 'sensors', source: 'p. 208',
+    description: 'Use System: scan an object within 1 mile with Intelligence (Investigation). The GM sets the check and information revealed, including lifesigns and functional power.' },
+  { id: 'engineer-planetary-scan', roleId: 'engineer', name: 'Planetary Scan', type: 'skillCheck', skillLabel: 'Intelligence (Investigation)', requiresSystem: 'sensors', source: 'p. 209',
+    description: 'Use System: scan a planet within 1,000 miles with Intelligence (Investigation) for major environmental hazards, habitation, and GM-chosen details.' },
+  { id: 'gunner-attack', roleId: 'gunner', name: 'Attack', type: 'description', source: 'pp. 210–213, 220–221',
+    description: 'Take the Attack action using any installed ship weapons. Apply your character’s weapon proficiencies and applicable class features. Recharge weapons can fire only once before the start of the Initiative order. Mastery effects apply only if the character has unlocked that weapon’s mastery.' },
+  { id: 'gunner-arcane-cannon', roleId: 'gunner', name: 'Arcane Cannon', type: 'description', requiresSystem: 'arcane-cannon', source: 'p. 220',
+    description: 'Magic action: cast a Mega spell or magnify an eligible action/Bonus Action spell targeting an area or another creature, with GM approval. Multiply distances by 100; use Mega damage and targets. Atmosphere or significant gravity disrupts the spell. Concentration saves after ship damage use DC max(10, half Mega damage rounded down), capped at 30.' },
+  ...PILOT_ACTIONS,
+  { id: 'dogfighter-launch', roleId: 'pilot-fighter', name: 'Launch / Dock Fighter', type: 'description', requiresSystem: 'fighter-bay', source: 'pp. 208, 223',
+    description: 'Bonus Action: board and launch from a Fighter Bay, becoming that craft’s Pilot. Docking takes an action. Use the deployed fighter’s stats and Pilot actions below.' },
+  ...PILOT_ACTIONS.map((action) => ({ ...action, id: action.id.replace('pilot-', 'dogfighter-'), roleId: 'pilot-fighter' })),
+  { id: 'dogfighter-eject', roleId: 'pilot-fighter', name: 'Escape Pod', type: 'description', source: 'pp. 207–208',
+    description: 'If the fighter has an Escape Pod, its Pilot ejects automatically at 0 Mega Hit Points. No Reaction is required.' },
+];
 
-function CREW_ROLES_GROUP(): Record<string, CrewActionDef[]> {
-  const out: Record<string, CrewActionDef[]> = {};
-  for (const action of CREW_ACTIONS) {
-    (out[action.roleId] ??= []).push(action);
-  }
-  return out;
-}
+export const CREW_ACTIONS_BY_ROLE: Record<string, CrewActionDef[]> = {};
+for (const action of CREW_ACTIONS) (CREW_ACTIONS_BY_ROLE[action.roleId] ??= []).push(action);
 
-/** Whether this action is available on the given ship. */
 export function isActionAvailable(
   action: CrewActionDef,
-  ship: { size: ShipSize; systems: Record<string, number> },
+  ship: { size: ShipSize; systems: Record<string, number>; darkMatterClass?: number },
 ): { ok: boolean; reason?: string } {
-  if (action.requiresSystem && (ship.systems[action.requiresSystem] ?? 0) < 1) {
-    const name = action.requiresSystem.replace(/-/g, ' ');
-    return { ok: false, reason: `Requires ${name} system.` };
+  // Flight actions of a fighter pilot refer to the deployed craft, not its carrier.
+  if (action.roleId === 'pilot-fighter' && !action.requiresSystem) {
+    if (action.requiresEngine) return { ok: false, reason: 'Catalog fighters have no Dark Matter engine.' };
+    return { ok: true };
   }
-  if (action.minSize && sizeRank(ship.size) < sizeRank(action.minSize)) {
-    return { ok: false, reason: `Requires ${action.minSize} size or larger.` };
-  }
-  if (action.maxSize && sizeRank(ship.size) > sizeRank(action.maxSize)) {
-    return { ok: false, reason: `Only on ${action.maxSize} size or smaller.` };
-  }
+  if (action.requiresEngine && !(ship.darkMatterClass && ship.darkMatterClass > 0)) return { ok: false, reason: 'Requires a Dark Matter engine.' };
+  if (action.requiresSystem && !(ship.systems[action.requiresSystem] > 0)) return { ok: false, reason: 'Requires ' + action.requiresSystem.replace(/-/g, ' ') + ' system.' };
+  if (action.minSize && sizeRank(ship.size) < sizeRank(action.minSize)) return { ok: false, reason: 'Requires ' + action.minSize + ' size or larger.' };
+  if (action.maxSize && sizeRank(ship.size) > sizeRank(action.maxSize)) return { ok: false, reason: 'Only on ' + action.maxSize + ' size or smaller.' };
   return { ok: true };
 }
 
-/** Ram damage dice by ship size (p. 222). */
-export function ramDamageDice(size: ShipSize): string {
-  if (size === 'Transport') return '3d10';
-  if (size === 'Corvette' || size === 'Frigate') return '4d10';
-  return '2d10';
+export function emergencyRepairDice(level: number): number {
+  return Math.max(1, Math.floor(level / 2));
 }

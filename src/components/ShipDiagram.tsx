@@ -8,6 +8,7 @@ import {
 import {
   effectiveDmClass,
   fighterSlotsUsed,
+  fighterBayMhp,
   fighterWeaponsByFacing,
   slotsUsed,
   weaponsByFacing,
@@ -59,12 +60,12 @@ export default function ShipDiagram({
     ? fighterWeaponsByFacing(fighterBay!.weapons)
     : weaponsByFacing(ship);
   const used = isBayFighter ? fighterSlotsUsed(fighterBay!) : slotsUsed(ship);
-  const totalSlots = isBayFighter ? FIGHTER_SLOT_COUNT : ship.totalSlots;
+  const totalSlots = isBayFighter ? (hull?.slots ?? FIGHTER_SLOT_COUNT) : ship.totalSlots;
   const dm = effectiveDmClass(ship);
   const pips = Array.from({ length: totalSlots }, (_, i) => i < used);
 
   const displaySize: ShipSize = isFighterHull ? 'Fighter' : ship.size;
-  const displayMhp = isBayFighter ? (hull?.mhp ?? '—') : ship.mhp;
+  const displayMhp = isBayFighter ? fighterBayMhp(fighterBay!) : ship.mhp;
   const displayAc = isBayFighter ? (hull?.ac ?? '—') : ship.ac;
   const displaySpeed = isBayFighter ? (hull?.speed ?? 0) : ship.speed;
   const displayManeuver = isBayFighter ? (hull?.maneuverability ?? '—') : ship.maneuverability;
@@ -282,7 +283,7 @@ export default function ShipDiagram({
         {isBayFighter
           ? 'Bay fighter weapons — select arc, then mount from the Weapons loadout (Fighter target).'
           : ship.isFighterBuild
-            ? 'Custom fighter: 6 slots, MHP ≥ 5 × level, shield generator = 8 SP. No standard Escape Pods or railguns.'
+            ? 'GM custom fighter: hull-specific slots, MHP ≥ 5 × pilot level, shield generator = 4 SP.'
             : "Escape Pods, Life Support, Sensors, Shield Generator, and Pilot's Seat are integrated into the hull. Only weapons mount to arc hardpoints — Fixed weapons on Fore/Port/Starboard/Aft; all others on the Turret."}
       </p>
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { Ship } from '../lib/types';
 import {
   defaultPrintOptions,
@@ -14,17 +14,15 @@ interface Props {
   onConfirm: (options: PrintOptions) => void;
 }
 
-export default function PrintOptionsDialog({ open, ship, onCancel, onConfirm }: Props) {
+export default function PrintOptionsDialog(props: Props) {
+  return props.open ? <OpenPrintOptionsDialog {...props} /> : null;
+}
+
+function OpenPrintOptionsDialog({ ship, onCancel, onConfirm }: Props) {
   const [options, setOptions] = useState<PrintOptions>(() => defaultPrintOptions(ship));
 
   const hasImage = !!ship.shipImageDataUrl;
   const hasCrewActions = ship.crewRoles.some((id) => CREW_ROLES_BY_ID[id]);
-
-  useEffect(() => {
-    if (open) setOptions(defaultPrintOptions(ship));
-  }, [open, ship]);
-
-  if (!open) return null;
 
   const toggle = (key: keyof PrintOptions) => {
     setOptions((prev) => ({ ...prev, [key]: !prev[key] }));

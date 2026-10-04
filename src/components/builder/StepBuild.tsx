@@ -26,6 +26,7 @@ import {
   setFighterBayDisplayName,
   syncFighterBays,
   fighterSlotsRemaining,
+  fighterBayMhp,
   effectiveDmClass,
   dmEngineUpgradeCost,
   weaponHasFixed,
@@ -67,7 +68,7 @@ export default function StepBuild({ ship, update, selectedFacing, configTarget }
         </h2>
         <p className="text-slate-400 text-sm mt-1">
           {ship.isFighterBuild
-            ? 'Custom fighters have 6 slots and MHP of at least 5 × level. Shield generators provide 8 SP. Standard Escape Pods (600 CR) are incompatible — use Escape Pod (Fighter). Railguns cannot be mounted.'
+            ? 'Custom fighter construction is a GM option. Hull slots vary; player-controlled MHP is at least 5 × pilot level. Shield generators provide 4 SP. Use the 50 CR Fighter Escape Pod.'
             : 'Spend Credits on systems, weapons, and upgrades. Hull-embedded systems are pre-installed in the body. Only weapons use mount points — Fixed on arc facings, others on the Turret.'}{' '}
           Hover the <span className="text-amber">i</span> icon for details.
         </p>
@@ -321,7 +322,7 @@ function FighterBayAssignments({
   return (
     <div className="mt-3 pt-2 border-t border-slate-700/60 space-y-3">
       <p className="font-mono-hud text-[10px] text-slate-400">
-        Pre-built fighters (each bay has its own 6-slot loadout):
+        Pre-built fighters (each hull has its own capacity; bracket-priced craft require GM approval):
       </p>
       {Array.from({ length: bayCount }, (_, i) => {
         const bay = bays[i];
@@ -361,10 +362,19 @@ function FighterBayAssignments({
                 className="w-full bg-void border border-amber/40 rounded-sm px-2 py-1 font-mono-hud text-xs text-amber"
               />
             )}
+            {hull && !hull.gmOnly && !hull.npcOnly && (
+              <label className="text-xs text-slate-400">
+                Player pilot level (blank = stock NPC MHP)
+                <input type="number" min={1} max={20} value={bay.pilotLevel ?? ''}
+                  onChange={(e) => { const level = e.target.value === '' ? null : Math.max(1, Math.min(20, Math.trunc(Number(e.target.value))));
+                    update((s) => ({ ...s, fighterBays: syncFighterBays(s).map((b, index) => index === i ? { ...b, pilotLevel: level } : b) })); }} />
+              </label>
+            )}
+            {hull?.trait && <p className="text-xs text-slate-400">{hull.trait}</p>}
             {hull && (
               <p className="font-mono-hud text-[9px] text-slate-500">
                 {hull.subtitle} · {hull.cost.toLocaleString()} CR deploy · AC {hull.ac} MHP{' '}
-                {hull.mhp} · configure loadout via F{i + 1} on the hull diagram
+                {fighterBayMhp(bay)} · {hull.slots} slots · configure loadout via F{i + 1} on the hull diagram
               </p>
             )}
           </div>
@@ -489,8 +499,8 @@ function WeaponsTab({
           — Fixed weapons use this arc; non-fixed auto-mount on Turret
         </span>
       </div>
-      {renderGroup('RANGED', RANGED_WEAPONS)}
-      {renderGroup('MELEE', MELEE_WEAPONS)}
+      {renderGroup('RANGED', RANGED_WEAPONS.filter((w) => !w.catalogOnly && !w.frameWeapon))}
+      {renderGroup('MELEE', MELEE_WEAPONS.filter((w) => !w.catalogOnly && !w.frameWeapon))}
     </div>
   );
 }
@@ -508,53 +518,30 @@ function UpgradesTab({
   return (
     <div className="grid sm:grid-cols-2 gap-3">
       {UPGRADES.map((def) => {
-        const installed = ship.upgrades.includes(def.id);
+        const count = ship.upgrades.filter((id) => id === def.id).length;
         const prereq = canInstallUpgrade(ship, def);
-        const noBudget = def.cost > remaining;
-        const blockedReason = installed
-          ? undefined
-          : !prereq.ok
-            ? prereq.reason
-            : noBudget
-              ? 'Not enough Credits.'
-              : undefined;
+        const reason = !prereq.ok ? prereq.reason : def.cost > remaining ? 'Not enough Credits.' : undefined;
         return (
-          <button
-            key={def.id}
-            type="button"
-            disabled={!installed && !!blockedReason}
-            title={blockedReason}
-            onClick={() =>
-              update((s) =>
-                installed
-                  ? { ...s, upgrades: s.upgrades.filter((u) => u !== def.id) }
-                  : { ...s, upgrades: [...s.upgrades, def.id] },
-              )
-            }
-            className={`text-left panel p-3 transition-all ${
-              installed ? 'border-cyan! shadow-[0_0_14px_#00e5ff55]' : 'hover:border-cyan/60'
-            } ${!installed && blockedReason ? 'opacity-45 cursor-not-allowed' : 'cursor-pointer'}`}
-          >
+          <div key={def.id} className={`panel p-3 ${count ? 'border-cyan!' : ''}`}>
             <div className="flex items-center gap-1">
               <span className="font-display text-sm text-cyan">{def.name}</span>
               <InfoTooltip text={def.description} />
-              {installed && <span className="text-ok text-xs ml-auto">✓</span>}
             </div>
-            <div className="mt-1 flex items-center gap-2">
+            <p className="text-xs text-slate-400 mt-1">{def.description}</p>
+            <div className="flex items-center justify-between mt-2">
               <CostTag cost={def.cost} />
-              {def.minSize && (
-                <span className="font-mono-hud text-[10px] text-slate-500">{def.minSize}+</span>
-              )}
-              {def.minDmClass != null && (
-                <span className="font-mono-hud text-[10px] text-slate-500">
-                  DM {def.minDmClass}+
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                <button type="button" className="btn !px-2" disabled={count === 0}
+                  aria-label={`Remove ${def.name}`}
+                  onClick={() => update((s) => { const index = s.upgrades.indexOf(def.id); return { ...s, upgrades: s.upgrades.filter((_, i) => i !== index) }; })}>−</button>
+                <span>{count}/{def.maxInstalls ?? 1}</span>
+                <button type="button" className="btn !px-2" disabled={!!reason} title={reason}
+                  aria-label={`Install ${def.name}`}
+                  onClick={() => update((s) => ({ ...s, upgrades: [...s.upgrades, def.id] }))}>+</button>
+              </div>
             </div>
-            {!installed && blockedReason && (
-              <p className="text-danger/80 font-mono-hud text-[10px] mt-1">{blockedReason}</p>
-            )}
-          </button>
+            {reason && <p className="text-slate-500 text-[10px] mt-1">{reason}</p>}
+          </div>
         );
       })}
     </div>
@@ -585,14 +572,13 @@ function EngineTab({
   // Cost to go from current effective class to the next one.
   const nextClass = current + 1;
   const nextStepCost = DM_ENGINE_COSTS[nextClass] ?? null;
-  const canUpgrade = nextClass <= 9 && nextStepCost != null && nextStepCost <= remaining;
+  const canUpgrade = nextClass <= 9 && nextStepCost != null && nextStepCost - currentUpgradeCost <= remaining;
 
   return (
     <div className="panel p-4 space-y-4">
       <p className="text-slate-400 text-sm">
         Your hull's base Dark Matter Engine is <span className="text-cyan">Class {baseClass}</span>{' '}
-        (set by level). Upgrading raises jump capability — each class is purchased in
-        sequence per the engine table.
+        (set by level). Upgrading raises jump capability — pay the listed price of the selected replacement engine (p. 219).
       </p>
 
       <div className="flex items-center justify-between panel p-3">

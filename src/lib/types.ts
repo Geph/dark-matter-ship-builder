@@ -24,6 +24,8 @@ export interface ShipWeapon {
 export type FighterType = 'none' | 'catalog';
 
 export interface FighterBaySlot {
+  /** Set for a player-controlled fighter; omitted/null uses stock MHP. */
+  pilotLevel?: number | null;
   type: FighterType;
   /** Catalog hull id when type is `catalog` (see fighters.ts). */
   catalogId: string | null;
@@ -36,12 +38,16 @@ export interface FighterBaySlot {
 
 /** Skill / combat data collected per crew role for in-play rolls. */
 export interface CrewMemberData {
+  /** Ability modifier for Emergency Repairs, separate from the skill total. */
+  abilityModifier?: number;
+  /** Damage modifier for melee weapons; Firearms do not add this. */
+  damageModifier?: number;
   name: string;
   /** Primary skill modifier (Vehicles, Gunnery, Mechanics, etc.). */
   skillModifier: number;
   /** Attack bonus for weapon rolls (typically the Gunner). */
   attackBonus: number;
-  /** Mega spells selected for the Gunner (Arcane Cannon, pp. 402–405). */
+  /** Mega spells selected for the Gunner (Arcane Cannon, pp. 401–404). */
   megaSpells: string[];
   /** Portrait shown on the ship sheet crew action panel. */
   imageDataUrl?: string | null;

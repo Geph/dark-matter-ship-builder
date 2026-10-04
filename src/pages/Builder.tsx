@@ -72,28 +72,6 @@ export default function Builder() {
 
 
 
-  useEffect(() => {
-
-    if (!showBayConfig) {
-
-      setConfigTarget('mothership');
-
-    } else if (
-
-      typeof configTarget === 'number' &&
-
-      configTarget >= fighterBays.length
-
-    ) {
-
-      setConfigTarget('mothership');
-
-    }
-
-  }, [showBayConfig, fighterBays.length, configTarget]);
-
-
-
   const update = useCallback((mutator: (s: Ship) => Ship) => {
 
     setShipState((prev) => {
@@ -120,9 +98,7 @@ export default function Builder() {
 
     }
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-
-  }, []);
+  }, [id, navigate]);
 
 
 
@@ -144,7 +120,7 @@ export default function Builder() {
 
 
 
-  const effectiveConfigTarget = ship.isFighterBuild ? 'mothership' : configTarget;
+  const effectiveConfigTarget = !showBayConfig || (typeof configTarget === 'number' && configTarget >= fighterBays.length) ? 'mothership' : configTarget;
 
 
 
@@ -294,7 +270,7 @@ export default function Builder() {
 
                       bays: fighterBays,
 
-                      active: configTarget,
+                      active: effectiveConfigTarget,
 
                       onSelect: setConfigTarget,
 
@@ -334,7 +310,7 @@ export default function Builder() {
 
                       bays: fighterBays,
 
-                      active: configTarget,
+                      active: effectiveConfigTarget,
 
                       onSelect: setConfigTarget,
 

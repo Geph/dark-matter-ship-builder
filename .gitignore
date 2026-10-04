@@ -9,6 +9,7 @@ lerna-debug.log*
 
 node_modules
 dist
+tmp/
 .env
 .env.*
 !.env.example

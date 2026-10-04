@@ -31,19 +31,19 @@ export const CREW_ROLES: CrewRole[] = [
     systemId: 'pilots-seat',
     skillFields: [
       { key: 'name', label: 'Pilot Name', hint: 'Character operating the helm.' },
-      { key: 'skillModifier', label: 'Vehicles (Space) Mod.', hint: 'Pilot skill checks & maneuver rolls.' },
+      { key: 'skillModifier', label: 'Dexterity (Piloting) Mod.', hint: 'Pilot skill checks & maneuver rolls.' },
     ],
   },
   {
     id: 'pilot-fighter',
     label: 'Pilot (Fighter Bay)',
     description:
-      'Flies a deployable fighter. First Fighter Bay you install is free. Level 5+.',
+      'Flies a deployable fighter. Automatically installs a free Fighter Bay. Level 5+.',
     systemId: 'fighter-bay',
     minLevel: 5,
     skillFields: [
       { key: 'name', label: 'Pilot Name', hint: 'Fighter pilot callsign.' },
-      { key: 'skillModifier', label: 'Vehicles (Space) Mod.', hint: 'Fighter maneuver & dogfight rolls.' },
+      { key: 'skillModifier', label: 'Dexterity (Piloting) Mod.', hint: 'Fighter Piloting checks, including Evasive Maneuvers.' },
     ],
   },
   {
@@ -54,7 +54,8 @@ export const CREW_ROLES: CrewRole[] = [
     skillFields: [
       { key: 'name', label: 'Gunner Name', hint: 'Weapon systems operator.' },
       { key: 'skillModifier', label: 'Gunnery Mod.', hint: 'Targeting and weapon system checks.' },
-      { key: 'attackBonus', label: 'Attack Bonus', hint: 'Added to d20 weapon attack rolls.' },
+      { key: 'attackBonus', label: 'Attack Bonus', hint: 'Your character attack bonus, including applicable proficiency; not derived from ship level.' },
+      { key: 'damageModifier', label: 'Melee Damage Modifier', hint: 'Ability modifier for melee attacks; Firearm damage does not add it.' },
     ],
   },
   {
@@ -64,7 +65,8 @@ export const CREW_ROLES: CrewRole[] = [
     systemId: 'engineers-station',
     skillFields: [
       { key: 'name', label: 'Engineer Name', hint: 'Chief technician on board.' },
-      { key: 'skillModifier', label: 'Mechanics Mod.', hint: 'Repairs, jury-rigs, and system diagnostics.' },
+      { key: 'skillModifier', label: 'Athletics / Technology Mod.', hint: 'Total check modifier for Emergency Repairs. Other skills may differ.' },
+      { key: 'abilityModifier', label: 'Repair Ability Modifier', hint: 'Strength or Intelligence only; excludes proficiency. Added to repair dice.' },
     ],
   },
   {

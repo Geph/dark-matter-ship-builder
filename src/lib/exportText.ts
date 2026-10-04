@@ -4,7 +4,8 @@ import { UPGRADES_BY_ID } from '../data/upgrades';
 import { WEAPONS_BY_NAME } from '../data/weapons';
 import { CREW_ROLES } from '../data/crewRoles';
 import { shipDimensions } from '../data/shipStats';
-import { effectiveDmClass, slotsUsed } from './rules';
+import { effectiveDmClass, slotsUsed, syncFighterBays, fighterBayMhp, fighterBayShieldPoints, fighterSlotsUsed, fighterSlotCapacity } from './rules';
+import { fighterDisplayName, fighterHullById, resolveFighterBayHull } from '../data/fighters';
 
 // Builds the plain-text stat block used by "Copy to Clipboard".
 
@@ -26,6 +27,11 @@ export function shipToText(ship: Ship): string {
   lines.push(`  Slots: ${used}/${ship.totalSlots}`);
   lines.push(`  Cargo: ${ship.cargo.toLocaleString()} tons  •  Passengers: ${ship.passengers}`);
   lines.push(`  Dimensions: ${shipDimensions(ship.size, ship.dimensionsOverride)}`);
+  if (ship.isFighterBuild) {
+    lines.push('  GM custom fighter (not the standard ship-creation budget).');
+    const trait = fighterHullById(ship.fighterHullId)?.trait;
+    if (trait) lines.push(`  ${trait}`);
+  }
 
   lines.push(THIN);
   lines.push('  SYSTEMS');
@@ -53,6 +59,26 @@ export function shipToText(ship: Ship): string {
   for (const id of ship.upgrades) {
     const def = UPGRADES_BY_ID[id];
     if (def) lines.push(`  • ${def.name}`);
+  }
+
+  const bays = syncFighterBays(ship);
+  if (bays.length > 0) {
+    lines.push(THIN, '  FIGHTER BAYS');
+    bays.forEach((bay, index) => {
+      lines.push(`  ${index + 1}. ${fighterDisplayName(bay)}`);
+      const hull = resolveFighterBayHull(bay);
+      if (!hull) return;
+      lines.push(`    MHP: ${fighterBayMhp(bay)} • AC: ${hull.ac} • SP: ${fighterBayShieldPoints(bay)}`);
+      lines.push(`    Speed: ${hull.speed.toLocaleString()} ft • Maneuverability: ${hull.maneuverability}° • Slots: ${fighterSlotsUsed(bay)}/${fighterSlotCapacity(bay)}`);
+      lines.push(`    Pilot level: ${bay.pilotLevel ?? 'NPC / stock MHP'}`);
+      if (hull.trait) lines.push(`    ${hull.trait}`);
+      for (const [id, count] of Object.entries(bay.systems)) {
+        if (count > 0) lines.push(`    • ${SYSTEMS_BY_ID[id]?.name ?? id} ×${count}`);
+      }
+      for (const weapon of bay.weapons) {
+        lines.push(`    • ${weapon.name} [${weapon.facing}] — ${WEAPONS_BY_NAME[weapon.name]?.damage ?? 'unknown weapon'}`);
+      }
+    });
   }
 
   lines.push(THIN);

@@ -5,12 +5,12 @@ local setup, where code lives, and what we expect in pull requests.
 
 ## Getting started
 
-Requirements: Node.js 18+ and npm.
+Requirements: Node.js 24 (24.13.0 or newer within 24.x) and npm.
 
 ```bash
 git clone https://github.com/Geph/dark-matter-ship-builder.git
 cd dark-matter-ship-builder
-npm install
+npm ci
 npm run dev
 ```
 
@@ -25,6 +25,8 @@ Optional Supabase variables are documented in [`.env.example`](.env.example).
 Run these from the repo root:
 
 ```bash
+npm audit
+npm test
 npm run lint
 npm run build
 ```
@@ -34,8 +36,9 @@ npm run build
   (`tsc -b`), and produces a production Vite build. There is no separate
   typecheck script; the build step is the typecheck.
 
-There is no automated test suite yet. Describe what you tested manually in your
-PR (e.g. builder step, ship sheet, My Ships, print flow).
+`npm test` runs the rules, import-safety, persistence and export regression suite.
+Also describe relevant browser checks in your PR (builder, ship sheet, My Ships,
+print flow). `npm audit` checks all locked production and development dependencies.
 
 ## Branch naming
 
@@ -90,7 +93,7 @@ enforcement in `src/lib/rules.ts`; keep presentation in components and pages.
 Changes that affect *Dark Matter Sci-Fi 5E* rules accuracy (stats, costs,
 prerequisites, crew actions, etc.) should **cite the rulebook page** in the PR
 description, consistent with how the README references ship creation on
-**pp. 206–220**. If you adjust data, say which table or section you matched.
+**printed pp. 215–219**. If you adjust data, say which table or section you matched.
 
 ## Code of conduct
 

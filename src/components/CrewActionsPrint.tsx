@@ -44,7 +44,7 @@ export default function CrewActionsPrint({ ship }: Props) {
                   const avail = isActionAvailable(action, ship);
                   return (
                     <li key={action.id} className={!avail.ok ? 'opacity-60' : undefined}>
-                      <p className="font-display text-xs tracking-wide">{action.name}</p>
+                      <p className="font-display text-xs tracking-wide">{action.name} ({action.source})</p>
                       <p className="text-[11px] leading-relaxed">{action.description}</p>
                       {!avail.ok && avail.reason && (
                         <p className="text-[10px] mt-0.5">{avail.reason}</p>
@@ -84,7 +84,7 @@ export default function CrewActionsPrint({ ship }: Props) {
                             <p>
                               {spell.name} (level {spell.level}) — {spell.damage}
                             </p>
-                            <p>{spell.description}</p>
+                            <p>{spell.description} ({spell.source})</p>
                             {spell.save && (
                               <p>
                                 Save: {spell.save} ({spell.saveEffect ?? 'see spell'})
