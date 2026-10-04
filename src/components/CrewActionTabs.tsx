@@ -52,6 +52,7 @@ export default function CrewActionTabs({ ship }: Props) {
 
       {role && (
         <CrewActionPanel
+          key={roleId}
           ship={ship}
           roleId={roleId}
           roleLabel={role.label}

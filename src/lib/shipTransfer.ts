@@ -1,4 +1,5 @@
 import type { Ship } from './types';
+import { MAX_IMPORT_BYTES, validateImportedShips } from './importValidation';
 
 export const TRANSFER_FORMAT = 'dark-matter-ship-builder';
 export const TRANSFER_FORMAT_VERSION = 2;
@@ -51,31 +52,23 @@ export function downloadShipExport(ships: Ship[]): void {
   URL.revokeObjectURL(url);
 }
 
-function isShipLike(value: unknown): value is Ship {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'id' in value &&
-    'name' in value &&
-    'size' in value
-  );
-}
-
 function shipsFromJson(parsed: unknown): Ship[] {
   if (Array.isArray(parsed)) {
-    return parsed.filter(isShipLike);
+    return validateImportedShips(parsed);
   }
   if (typeof parsed !== 'object' || parsed === null) return [];
 
   const record = parsed as Record<string, unknown>;
   if (Array.isArray(record.ships)) {
-    return record.ships.filter(isShipLike);
+    if (record.format != null && record.format !== TRANSFER_FORMAT) throw new Error('Unsupported import format.');
+    if (record.formatVersion != null && ![1, TRANSFER_FORMAT_VERSION].includes(Number(record.formatVersion))) throw new Error('Unsupported import version.');
+    return validateImportedShips(record.ships);
   }
-  if (isShipLike(parsed)) return [parsed];
-  return [];
+  return validateImportedShips([parsed]);
 }
 
 export function parseShipImportFile(text: string): Ship[] {
+  if (text.length > MAX_IMPORT_BYTES) throw new Error('Import file exceeds 10 MB.');
   const parsed: unknown = JSON.parse(text);
   const ships = shipsFromJson(parsed);
   if (ships.length === 0) {

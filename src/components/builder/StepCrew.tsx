@@ -137,7 +137,7 @@ export default function StepCrew({ ship, update }: Props) {
           </div>
           <p className="glow-green font-mono-hud text-xs mt-2 tracking-wide uppercase">
             {ship.isFighterBuild && fighterHull
-              ? `Fighter · ${fighterHull.name} · 6 slots · MHP ${customFighterMhp(ship)} (min ${5 * ship.level}) · AC ${fighterHull.ac}`
+              ? `Fighter · ${fighterHull.name} · ${fighterHull.slots} slots · MHP ${customFighterMhp(ship)} (min ${5 * ship.level}) · AC ${fighterHull.ac}`
               : `${stats.size} · DM Class ${stats.dmClass} · ${stats.slots} slots · MHP ${stats.mhp}`}
           </p>
 
@@ -153,7 +153,7 @@ export default function StepCrew({ ship, update }: Props) {
             </span>
           </label>
           <p className="text-slate-500 text-[10px] font-mono-hud mt-1 pl-6">
-            Pilot only · 1 player · 6 slots · pick a fighter-class hull from the catalog.
+            GM option: Pilot only, 1 player, hull-specific slots. The book provides fighter purchases and player MHP scaling, not a separate fighter construction budget.
           </p>
 
           {ship.isFighterBuild && (
@@ -164,7 +164,7 @@ export default function StepCrew({ ship, update }: Props) {
                 onChange={(e) => update((s) => setFighterBuildHull(s, e.target.value))}
                 className="w-full mt-1 text-sm"
               >
-                {FIGHTER_CATALOG.map((h) => (
+                {FIGHTER_CATALOG.filter((h) => !h.npcOnly && !h.gmOnly).map((h) => (
                   <option key={h.id} value={h.id}>
                     {h.name} — {h.subtitle} (AC {h.ac}, MHP {h.mhp})
                   </option>
@@ -215,7 +215,7 @@ export default function StepCrew({ ship, update }: Props) {
             >
               <button
                 type="button"
-                disabled={locked}
+                disabled={locked && !selected}
                 onClick={() => toggleRole(role.id)}
                 title={
                   fighterLocked
@@ -282,7 +282,7 @@ export default function StepCrew({ ship, update }: Props) {
                   {role.id === 'gunner' && (
                     <label className="block mt-2">
                       <span className="font-mono-hud text-[10px] text-fuchsia-400">
-                        MEGA SPELLS (pp. 402–405)
+                      MEGA SPELLS (pp. 401–404)
                       </span>
                       <p className="text-slate-500 text-[10px] mb-1">
                         Requires Arcane Cannon on the ship. Hold Ctrl/Cmd to select multiple.

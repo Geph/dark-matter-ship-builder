@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { Ship } from '../lib/types';
+import { MAX_IMPORT_BYTES } from '../lib/importValidation';
 import {
   listShips,
   deleteShip,
@@ -46,6 +47,7 @@ export default function MyShips() {
 
   const handleImport = async (file: File) => {
     try {
+      if (file.size > MAX_IMPORT_BYTES) throw new Error('Import file exceeds 10 MB.');
       const text = await file.text();
       const parsed = parseShipImportFile(text);
       const count = importShips(parsed);

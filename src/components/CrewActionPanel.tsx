@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Ship } from '../lib/types';
 import type { CrewActionDef } from '../data/crewActions';
-import { isActionAvailable, ramDamageDice } from '../data/crewActions';
+import { isActionAvailable, emergencyRepairDice } from '../data/crewActions';
 import { WEAPONS_BY_NAME } from '../data/weapons';
 import { MEGA_SPELLS_BY_ID } from '../data/megaSpells';
 import { rollD20, rollWeaponDamage, rollDice, parseDamageDice } from '../lib/dice';
@@ -27,6 +27,8 @@ export default function CrewActionPanel({
   attackBonus,
   actions,
 }: Props) {
+  const [checkModifiers, setCheckModifiers] = useState<Record<string, number>>({});
+  const [repairLevel, setRepairLevel] = useState(ship.level);
   const [results, setResults] = useState<Record<string, string>>({});
   const hasArcaneCannon = (ship.systems['arcane-cannon'] ?? 0) > 0;
   const gunnerSpells = ship.crewMembers?.gunner?.megaSpells ?? [];
@@ -36,7 +38,7 @@ export default function CrewActionPanel({
   };
 
   const rollSkill = (action: CrewActionDef) => {
-    const r = rollD20(skillModifier);
+    const r = rollD20(checkModifiers[action.id] ?? skillModifier);
     const dc = action.dc != null ? ` vs DC ${action.dc}` : '';
     const pass =
       action.dc != null
@@ -48,7 +50,7 @@ export default function CrewActionPanel({
   };
 
   const rollContested = (action: CrewActionDef) => {
-    const r = rollD20(skillModifier);
+    const r = rollD20(checkModifiers[action.id] ?? skillModifier);
     setResult(
       action.id,
       `${action.skillLabel}: ${r.total} (rolled ${r.rolls[0]}) — contested vs opposing pilot`,
@@ -57,7 +59,7 @@ export default function CrewActionPanel({
 
   const rollActionDice = (action: CrewActionDef) => {
     const notation =
-      action.id === 'pilot-ram' ? ramDamageDice(ship.size) : (action.dice ?? '1d6');
+      action.dice ?? '1d6';
     const parsed = parseDamageDice(notation);
     if (!parsed) {
       setResult(action.id, 'Unable to parse dice.');
@@ -98,7 +100,7 @@ export default function CrewActionPanel({
           const avail = isActionAvailable(action, ship);
           return (
             <li key={action.id} className={!avail.ok ? 'opacity-50' : ''}>
-              <p className="text-slate-300 text-xs font-display tracking-wide">{action.name}</p>
+              <p className="text-slate-300 text-xs font-display tracking-wide">{action.name} <span className="text-slate-500">({action.source})</span></p>
               <p className="text-slate-500 text-[11px] leading-relaxed">{action.description}</p>
               {!avail.ok && (
                 <p className="text-danger/70 text-[10px] mt-0.5">{avail.reason}</p>
@@ -106,6 +108,10 @@ export default function CrewActionPanel({
 
               {avail.ok && action.type === 'skillCheck' && (
                 <div className="mt-1 no-print">
+                  <label className="text-[10px] text-slate-400 mr-2">Check modifier
+                    <input type="number" className="w-16 ml-1" value={checkModifiers[action.id] ?? skillModifier}
+                      onChange={(e) => setCheckModifiers((previous) => ({ ...previous, [action.id]: Number(e.target.value) }))} />
+                  </label>
                   <button
                     type="button"
                     className="btn !py-1 !px-2 !text-[10px]"
@@ -120,6 +126,18 @@ export default function CrewActionPanel({
                 </div>
               )}
 
+              {avail.ok && action.id === 'engineer-emergency-repairs' && (
+                <div className="no-print text-xs mt-1">
+                  <label>Engineer level <input className="w-16" type="number" min={1} max={20} value={repairLevel}
+                    onChange={(e) => setRepairLevel(Math.max(1, Math.min(20, Math.trunc(Number(e.target.value)))))} /></label>
+                  <button className="btn !text-[10px]" onClick={() => {
+                    const count = emergencyRepairDice(repairLevel);
+                    const r = rollDice(count, 6, ship.crewMembers.engineer?.abilityModifier ?? 0);
+                    setResult('repair-healing', `${r.label}: [${r.rolls.join(', ')}] = ${r.total} MHP restored`);
+                  }}>Roll healing after a successful check</button>
+                  <p>{results['repair-healing']}</p>
+                </div>
+              )}
               {avail.ok && action.type === 'contestedCheck' && (
                 <div className="mt-1 no-print">
                   <button
@@ -143,7 +161,7 @@ export default function CrewActionPanel({
                     onClick={() => rollActionDice(action)}
                   >
                     🎲 Roll{' '}
-                    {action.id === 'pilot-ram' ? ramDamageDice(ship.size) : action.dice}
+                    {action.dice}
                   </button>
                   {results[action.id] && (
                     <p className="text-amber text-[11px] mt-1">{results[action.id]}</p>
@@ -207,7 +225,8 @@ export default function CrewActionPanel({
                         type="button"
                         className="btn btn-amber !py-1 !px-2 !text-[10px]"
                         onClick={() => {
-                          const r = rollWeaponDamage(def.damage);
+                          const modifier = def.properties.split(',').some((p) => p.trim() === 'Firearm') ? 0 : (ship.crewMembers[roleId]?.damageModifier ?? 0);
+                          const r = rollWeaponDamage(def.damage, modifier);
                           setResult(
                             dmgKey,
                             r
@@ -255,14 +274,13 @@ export default function CrewActionPanel({
               {gunnerSpells.map((spellId) => {
                 const spell = MEGA_SPELLS_BY_ID[spellId];
                 if (!spell) return null;
-                const atkKey = `spell-atk-${spellId}`;
                 const dmgKey = `spell-dmg-${spellId}`;
                 return (
                   <li key={spellId} className="text-[11px]">
                     <p className="text-fuchsia-400">
                       ✦ {spell.name} (level {spell.level}) — {spell.damage}
                     </p>
-                    <p className="text-slate-500 text-[10px]">{spell.description}</p>
+                    <p className="text-slate-500 text-[10px]">{spell.description} ({spell.source})</p>
                     {spell.save && (
                       <p className="text-slate-500 text-[10px]">
                         Save: {spell.save} ({spell.saveEffect ?? 'see spell'})
@@ -271,17 +289,8 @@ export default function CrewActionPanel({
                     <div className="flex flex-wrap gap-2 mt-1 no-print">
                       <button
                         type="button"
-                        className="btn !py-1 !px-2 !text-[10px]"
-                        onClick={() => {
-                          const r = rollD20(attackBonus);
-                          setResult(atkKey, `Spell attack ${r.total} (rolled ${r.rolls[0]})`);
-                        }}
-                      >
-                        🎲 Spell Attack
-                      </button>
-                      <button
-                        type="button"
                         className="btn btn-amber !py-1 !px-2 !text-[10px]"
+                        disabled={!/\d+d\d+/.test(spell.damage)}
                         onClick={() => {
                           const r = rollWeaponDamage(spell.damage);
                           setResult(
@@ -295,12 +304,6 @@ export default function CrewActionPanel({
                         🎲 Mega Damage
                       </button>
                     </div>
-                    {results[atkKey] && (
-                      <p className="text-cyan text-[11px] mt-1">
-                        <span className="text-slate-500">{spell.name} attack:</span>{' '}
-                        {results[atkKey]}
-                      </p>
-                    )}
                     {results[dmgKey] && (
                       <p className="text-amber text-[11px] mt-0.5">
                         <span className="text-slate-500">{spell.name} damage:</span>{' '}

@@ -8,13 +8,15 @@ import { CREW_ACTIONS_BY_ROLE } from '../data/crewActions';
 import CrewActionPanel from './CrewActionPanel';
 import ShipIcon from './ShipIcon';
 import { mapSizeFeet, shipDimensions } from '../data/shipStats';
-import { fighterDisplayName, resolveFighterBayHull } from '../data/fighters';
+import { fighterDisplayName, fighterHullById, resolveFighterBayHull } from '../data/fighters';
 import {
   effectiveDmClass,
   slotsUsed,
   lockedInstalls,
   isHullEmbeddedSystem,
   gunnerAttackBonus,
+  fighterBayMhp,
+  fighterBayShieldPoints,
   syncFighterBays,
   fighterSlotsUsed,
 } from '../lib/rules';
@@ -206,8 +208,9 @@ export default function StatBlock({
                   Bay {i + 1}
                   {hull ? ` · ${hull.name} (${hull.subtitle})` : ''}
                   {' · '}
-                  {used}/{FIGHTER_SLOT_COUNT} slots
+                  {used}/{hull?.slots ?? FIGHTER_SLOT_COUNT} slots
                 </p>
+                {hull && <p className="text-xs text-cyan mt-1">AC {hull.ac} · MHP {fighterBayMhp(bay)} · SP {fighterBayShieldPoints(bay)} · Speed {hull.speed} · Manu. {hull.maneuverability}° · Cargo {hull.cargo} tons · Passengers {hull.passengers}</p>}
                 {hull?.trait && (
                   <p className="text-slate-400 text-[10px] mt-1 italic">{hull.trait}</p>
                 )}
@@ -280,6 +283,11 @@ export default function StatBlock({
       </div>
 
       <AccordionSection label="SYSTEMS">
+        {ship.isFighterBuild && (
+          <p className="text-amber text-xs mb-2">
+            GM custom fighter. {fighterHullById(ship.fighterHullId)?.trait}
+          </p>
+        )}
         <p className="text-slate-500 text-[10px] mb-2">
           Hull-embedded systems are pre-installed in the body and do not use weapon mount points.
         </p>
@@ -302,6 +310,10 @@ export default function StatBlock({
                   {locked > 0 && !inHull && (
                     <span className="text-ok text-[10px] ml-1">[GRANTED]</span>
                   )}
+                  <details className="text-slate-400 text-xs pl-4 mt-1">
+                    <summary className="cursor-pointer">System rules</summary>
+                    <p>{def.description}</p>
+                  </details>
                 </li>
               );
             })}
@@ -340,11 +352,11 @@ export default function StatBlock({
           <p className="text-slate-500 text-sm">No upgrades installed.</p>
         ) : (
           <ul className="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
-            {ship.upgrades.map((id) => {
+            {ship.upgrades.map((id, index) => {
               const def = UPGRADES_BY_ID[id];
               if (!def) return null;
               return (
-                <li key={id} className="text-slate-200">
+                <li key={`${id}-${index}`} className="text-slate-200">
                   <span className="text-cyan">▸</span> {def.name}
                 </li>
               );

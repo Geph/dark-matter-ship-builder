@@ -72,7 +72,7 @@ export default function Landing() {
       </div>
 
       <p className="font-mono-hud text-[10px] text-slate-600 mt-16 tracking-widest">
-        Rules sourced from Dark Matter Sci-Fi 5E (pp. 206–220) · Mage Hand Press
+        Ship rules: Dark Matter Sci-Fi 5E (pp. 205–264); Mega spells (pp. 401–404) · Mage Hand Press
       </p>
     </div>
   );

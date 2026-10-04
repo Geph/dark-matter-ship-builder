@@ -1,8 +1,8 @@
 # Dark Matter // Ship Builder
 
 A fan-made web app for building starships under the **Dark Matter Sci-Fi 5E**
-ship-creation rules (Mage Hand Press, pp. 206–220). It walks your party through
-the official four-step flow, enforces Credits and slot limits automatically, and
+ship-creation rules (Mage Hand Press, printed pp. 215–219). It walks your party through
+the official four-step flow, checks Credits and slot limits, and
 renders a finished stat block you can print or export.
 
 The UI is styled as a starship terminal: dark panels, cyan glow, scanlines, and
@@ -11,11 +11,13 @@ arcs.
 
 **Live site:** https://geph.github.io/dark-matter-ship-builder/
 
-**Current release:** v0.2
+**Current release:** v0.4
 
 ![Dark Matter Ship Builder — landing page overview](docs/screenshots/overview.png)
 
 ### Changelog
+
+- **v0.4** — 2026-10-04: Security dependency updates, safer imports, corrected ship calculations and catalogs, current crew-action references, and automated regression checks.
 
 - **v0.2** — Ship and crew portraits, configurable print (image / stats / crew actions), contributor scaffolding, README screenshots.
 - **v0.1** — Initial public release: full ship builder, fighter builds and bays, crew actions, game-icons emblems, ship sheet, GitHub Pages deploy, and versioned releases.
@@ -26,7 +28,7 @@ arcs.
 
 | Step | Name | What you do |
 |------|------|-------------|
-| 1 | **Crew Manifest** | Set party level (1–20) and player count. Pick crew roles; each role auto-installs its system for free. Optional **custom fighter build** mode (pilot only, 6 slots). |
+| 1 | **Crew Manifest** | Set party level (1–20) and player count. Pick crew roles; each role auto-installs its system for free. Optional **GM custom fighter** mode (pilot only, hull-specific slots). |
 | 2 | **Hull Scan** | Roll d100 or pick from four official flavor tables. Override any result with custom text. |
 | 3 | **Loadout** | Spend Credits on systems, weapons, upgrades, and DM engine class upgrades. Configure **fighter bays** (catalog or saved custom fighters). Auto-included systems show at the top with replacement cost. GM can override the credit budget (with permission warning). |
 | 4 | **Designation** | Name the ship, upload a **portrait** for the ship sheet, christen into the registry, and review the stat block. |
@@ -74,16 +76,18 @@ Read-only play sheet for a saved ship (same browser registry for localStorage):
 - Systems and weapons cost **1 slot** each; upgrades cost **0**
 - Size and DM class prerequisites, repeat caps, pilot seat / fighter bay requirements
 - Crew-role and starting systems are **free**
-- Full fighter catalog with default loadouts; custom fighter builds sync to fighter bays
+- Fighter catalog with corrected loadouts, hull-specific slots, traits, and optional pilot-level MHP scaling
+- Corrected upgrade limits and derived-stat calculations
+- Current crew-action and Mega-spell reference with page citations
 
 ### Persistence
 
 Ships save to your browser’s **localStorage** by default — no account or server
 required.
 
-> **Share links** only appear when `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
-> are set (shared database) **and** the app is served on a public production URL
-> (not localhost). With localStorage alone, links are device-local.
+> Storage is local-only in this repository. Setting Supabase environment variables
+> does not implement shared persistence; the storage adapter must also be implemented.
+> Use JSON export/import to transfer builds between devices.
 
 ## Routes
 
@@ -99,16 +103,28 @@ On GitHub Pages the app is hosted under `/dark-matter-ship-builder/`.
 
 ## Quick start
 
-**Requirements:** Node.js 18+ and npm.
+**Requirements:** Node.js 24 (24.13.0 or newer within 24.x) and npm. See `.nvmrc`.
 
 ```bash
 git clone https://github.com/Geph/dark-matter-ship-builder.git
 cd dark-matter-ship-builder
-npm install
+npm ci
 npm run dev
 ```
 
 Open **http://localhost:5173** and click **Build a Ship**.
+
+### Checks
+
+```bash
+npm audit
+npm test
+npm run lint
+npm run build
+```
+
+CI runs these checks on pull requests and before deployment. Dependabot checks
+npm packages and pinned GitHub Actions weekly.
 
 ### Production build
 
@@ -230,6 +246,14 @@ To persist ships across devices and enable **Share** on a public deployment:
 - React 19 + React Router 7
 - Vite 8 + TypeScript
 - Tailwind CSS 4
+
+## Rules coverage
+
+This is a builder and play reference. Combat targeting, shield facing, charges,
+mastery, spell preparation/upcasting, travel, and GM adjudication remain manual.
+Drafts with rule warnings can still be saved. The standalone custom fighter
+budget is a GM option; player Battleframe construction and the larger NPC ship
+catalog are not implemented.
 
 ## Known issues / Roadmap
 
