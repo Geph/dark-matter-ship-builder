@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { emptyShip, recomputeShip, saveShip, getShip, importShips, listShips } from '../src/lib/storage';
-import { budgetForLevel, withGrantedSystems, computeCreditsSpent, computeShieldPoints, dmEngineUpgradeCost, canInstallUpgrade, validateShip, canInstallSystem, canInstallFighterSystem, canEquipWeaponOnFighterClass, slotsUsed, fighterSlotCapacity, fighterSlotsUsed, fighterBayMhp, fighterBayShieldPoints, fighterBayLoadoutBillableCost, setFighterBayCatalogId, gunnerAttackBonus, setFighterBuildHull, addWeapon } from '../src/lib/rules';
+import { budgetForLevel, withGrantedSystems, computeCreditsSpent, computeShieldPoints, dmEngineUpgradeCost, canInstallUpgrade, validateShip, canInstallSystem, canInstallFighterSystem, canEquipWeaponOnFighterClass, slotsUsed, fighterSlotCapacity, fighterSlotsUsed, fighterBayMhp, fighterBayShieldPoints, fighterBayLoadoutBillableCost, setFighterBayCatalogId, gunnerAttackBonus, setFighterBuildHull, addWeapon, installSystem, addFighterWeapon } from '../src/lib/rules';
 import { SHIP_STATS_BY_LEVEL, SHIELD_POINTS_BY_SIZE, MAP_SIZE_FEET } from '../src/data/shipStats';
 import { SYSTEMS_BY_ID } from '../src/data/systems';
 import { UPGRADES_BY_ID } from '../src/data/upgrades';
@@ -218,4 +218,35 @@ test('malformed imports fail before expensive work or persistence', () => {
   assert.throws(()=>parseShipImportFile(shipsToJson([ship]).replace('"systems": {','"systems": {"__proto__":1,')),/reserved key/);
   assert.throws(()=>parseShipImportFile(JSON.stringify(Array(101).fill(ship))),/at most 100/);
   assert.throws(()=>parseShipImportFile(' '.repeat(10*1024*1024+1)),/exceeds 10 MB/);
+});
+
+test('purchase functions enforce p. 218 slots, credits and system prerequisites', () => {
+  const ship = shipAt();
+  assert.equal(installSystem(ship, 'fighter-bay'), ship);
+  assert.equal(installSystem(ship, 'unknown'), ship);
+  const full = { ...ship, totalSlots: slotsUsed(ship) };
+  assert.equal(installSystem(full, 'probe'), full);
+  assert.equal(addWeapon(full, 'Phase Beam'), full);
+  const broke = { ...ship, creditBudgetOverride: 0 };
+  assert.equal(installSystem(broke, 'probe'), broke);
+  assert.equal(addWeapon(broke, 'Phase Beam'), broke);
+  assert.equal(installSystem({ ...ship, systems: { ...ship.systems, probe: 1 } }, 'probe').systems.probe, 1);
+});
+
+test('fighter purchases reject unknown weapons and respect pooled credits', () => {
+  let ship = shipAt(8);
+  ship.systems['fighter-bay'] = 1;
+  ship = recomputeShip(setFighterBayCatalogId(ship, 0, 'sabre'));
+  assert.equal(addFighterWeapon(ship, 0, 'unknown'), ship);
+  const broke = { ...ship, creditBudgetOverride: computeCreditsSpent(ship) };
+  assert.equal(addFighterWeapon(broke, 0, 'Mining Laser'), broke);
+  const malformed = structuredClone(ship);
+  malformed.fighterBays[0].systems.sensors = -1;
+  assert.ok(validateShip(malformed).some((e) => e.includes('nonnegative integers')));
+});
+
+test('a purchased pilot seat does not replace assigning a Pilot (p. 215)', () => {
+  const ship = shipAt();
+  ship.crewRoles = [];
+  assert.ok(validateShip(ship).some((e) => e.includes('Assign a Pilot')));
 });

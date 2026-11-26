@@ -328,6 +328,8 @@ export function canInstallUpgrade(ship: Ship, def: UpgradeDef): PrereqResult {
  */
 export function validateShip(ship: Ship): string[] {
   const errors: string[] = [];
+  if (!ship.crewRoles.includes('pilot')) errors.push('Assign a Pilot to operate the ship.');
+  if (ship.crewRoles.filter((r) => r === 'pilot' || r === 'pilot-fighter').length > 2) errors.push('A created ship supports at most two Pilot crew roles (p. 215).');
   const budget = effectiveBudget(ship);
   const spent = computeCreditsSpent(ship);
   const used = slotsUsed(ship);
@@ -444,7 +446,8 @@ export function validateShip(ship: Ship): string[] {
       errors.push(`${label}: over fighter slot capacity (${used}/${fighterSlotCapacity(bay)}).`);
     }
     for (const [id, count] of Object.entries(bay.systems)) {
-      if (count <= 0) continue;
+      if (!Number.isInteger(count) || count < 0) { errors.push(`${label}: system counts must be nonnegative integers.`); continue; }
+      if (count === 0) continue;
       if (id === 'escape-pods') {
         errors.push(
           `${label} — Standard Escape Pods are incompatible with fighters. Use Escape Pod (Fighter).`,
@@ -536,9 +539,12 @@ export function lockedInstalls(ship: Ship, systemId: string): number {
 
 /** Install one more instance of a system (caller should pre-check slots). */
 export function installSystem(ship: Ship, systemId: string): Ship {
+  const def = SYSTEMS_BY_ID[systemId];
+  if (!def || !canInstallSystem(ship, def).ok || slotsRemaining(ship) <= 0) return ship;
   const systems = { ...ship.systems };
   systems[systemId] = (systems[systemId] ?? 0) + 1;
-  return { ...ship, systems };
+  const next = { ...ship, systems };
+  return computeCreditsSpent(next) <= effectiveBudget(ship) ? next : ship;
 }
 
 /** Remove one instance of a system, never dropping below granted count. */
@@ -566,7 +572,9 @@ export function addWeapon(
   const resolved = resolveMountFacing(def, facing);
   const check = canMountWeapon(def, resolved);
   if (!check.ok) return ship;
-  return { ...ship, weapons: [...ship.weapons, { name, facing: resolved }] };
+  if (slotsRemaining(ship) <= 0) return ship;
+  const next = { ...ship, weapons: [...ship.weapons, { name, facing: resolved }] };
+  return computeCreditsSpent(next) <= effectiveBudget(ship) ? next : ship;
 }
 
 /** Remove the weapon at a given index. */
@@ -636,7 +644,8 @@ export function installFighterSystem(
     ...bay,
     systems: { ...bay.systems, [systemId]: (bay.systems[systemId] ?? 0) + 1 },
   };
-  return { ...ship, fighterBays: bays };
+  const next = { ...ship, fighterBays: bays };
+  return computeCreditsSpent(next) <= effectiveBudget(ship) ? next : ship;
 }
 
 export function removeFighterSystem(
@@ -676,7 +685,7 @@ export function addFighterWeapon(
   const def = WEAPONS_BY_NAME[name];
   const bays = syncFighterBays(ship);
   const bay = bays[bayIndex];
-  if (!bay || bay.type === 'none') return ship;
+  if (!def || !bay || bay.type === 'none') return ship;
   if (fighterSlotsRemaining(bay) <= 0) return ship;
 
   const resolved = def ? resolveMountFacing(def, facing) : facing;
@@ -691,7 +700,8 @@ export function addFighterWeapon(
     ...bay,
     weapons: [...bay.weapons, { name, facing: resolved }],
   };
-  return { ...ship, fighterBays: bays };
+  const next = { ...ship, fighterBays: bays };
+  return computeCreditsSpent(next) <= effectiveBudget(ship) ? next : ship;
 }
 
 export function removeFighterWeaponAt(ship: Ship, bayIndex: number, index: number): Ship {
@@ -728,6 +738,9 @@ export function setWeaponFacing(
   index: number,
   facing: WeaponFacing,
 ): Ship {
+  const weapon = ship.weapons[index];
+  const def = weapon && WEAPONS_BY_NAME[weapon.name];
+  if (!def || !canMountWeapon(def, facing).ok) return ship;
   const weapons = ship.weapons.map((w, i) => (i === index ? { ...w, facing } : w));
   return { ...ship, weapons };
 }
