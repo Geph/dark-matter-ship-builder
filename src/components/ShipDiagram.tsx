@@ -1,3 +1,4 @@
+import ShipHullSchematic from './ShipHullSchematic';
 import type { FighterBaySlot, Ship, ShipSize, WeaponFacing } from '../lib/types';
 import { WEAPONS_BY_NAME } from '../data/weapons';
 import {
@@ -9,6 +10,7 @@ import {
   effectiveDmClass,
   fighterSlotsUsed,
   fighterBayMhp,
+  fighterBayShieldPoints,
   fighterWeaponsByFacing,
   slotsUsed,
   weaponsByFacing,
@@ -66,6 +68,9 @@ export default function ShipDiagram({
 
   const displaySize: ShipSize = isFighterHull ? 'Fighter' : ship.size;
   const displayMhp = isBayFighter ? fighterBayMhp(fighterBay!) : ship.mhp;
+  const hullNow = isBayFighter ? displayMhp : ship.mhpCurrent ?? displayMhp;
+  const shieldMax = isBayFighter ? fighterBayShieldPoints(fighterBay!) : ship.shieldPoints;
+  const shieldNow = isBayFighter ? shieldMax : ship.shieldCurrent ?? shieldMax;
   const displayAc = isBayFighter ? (hull?.ac ?? '—') : ship.ac;
   const displaySpeed = isBayFighter ? (hull?.speed ?? 0) : ship.speed;
   const displayManeuver = isBayFighter ? (hull?.maneuverability ?? '—') : ship.maneuverability;
@@ -130,7 +135,7 @@ export default function ShipDiagram({
           </div>
           <div className="text-center">
             <div className="text-slate-400">MHP</div>
-            <div className="text-cyan glow-text text-base">{displayMhp}</div>
+            <div className="text-cyan glow-text text-base">{hullNow}/{displayMhp}</div>
           </div>
           <div className="text-right">
             <div className="text-slate-400">AC</div>
@@ -144,7 +149,7 @@ export default function ShipDiagram({
               </div>
               <div className="text-center">
                 <div className="text-slate-400">SHIELD</div>
-                <div className="text-cyan glow-text text-base">{ship.shieldPoints}</div>
+                <div className="text-cyan glow-text text-base">{shieldNow}/{shieldMax}</div>
               </div>
             </>
           )}
@@ -182,7 +187,7 @@ export default function ShipDiagram({
           </div>
 
           <div className="relative flex-1 min-h-[200px]">
-            <HullSvg size={displaySize} />
+            {fighterBay?.type === 'none' ? <div className="absolute inset-0 flex items-center justify-center text-slate-500 font-mono-hud text-xs">EMPTY BAY</div> : <ShipHullSchematic size={displaySize} mhp={hullNow} maxMhp={displayMhp} shields={shieldNow} maxShields={shieldMax} weapons={isBayFighter ? fighterBay!.weapons : ship.weapons} />}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="w-[38%] pointer-events-auto">
                 {renderMount({ facing: 'Turret', label: 'TURRET' })}
@@ -371,110 +376,5 @@ function MountButton({
         </ul>
       )}
     </div>
-  );
-}
-
-function hullVariant(size: ShipSize): 'personal' | 'transport' | 'corvette' | 'frigate' {
-  if (size === 'Fighter' || size === 'Personal') return 'personal';
-  if (size === 'Transport') return 'transport';
-  if (size === 'Corvette') return 'corvette';
-  return 'frigate';
-}
-
-function HullSvg({ size }: { size: ShipSize }) {
-  const variant = hullVariant(size);
-  const glow =
-    variant === 'personal'
-      ? '#00e5ff'
-      : variant === 'transport'
-        ? '#ffb300'
-        : variant === 'corvette'
-          ? '#38ff9c'
-          : '#e879f9';
-
-  return (
-    <svg
-      viewBox="0 0 250 300"
-      className="absolute inset-0 w-full h-full"
-      aria-hidden="true"
-    >
-      <defs>
-        <linearGradient id={`hullFill-${variant}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={variant === 'frigate' ? '#1a1030' : '#0e2230'} />
-          <stop offset="100%" stopColor="#0a131c" />
-        </linearGradient>
-        <filter id={`hullGlow-${variant}`} x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation="3" result="b" />
-          <feMerge>
-            <feMergeNode in="b" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-      </defs>
-
-      <g
-        filter={`url(#hullGlow-${variant})`}
-        stroke={glow}
-        strokeWidth="1.5"
-        fill={`url(#hullFill-${variant})`}
-      >
-        {variant === 'personal' && <PersonalHull />}
-        {variant === 'transport' && <TransportHull />}
-        {variant === 'corvette' && <CorvetteHull />}
-        {variant === 'frigate' && <FrigateHull />}
-      </g>
-    </svg>
-  );
-}
-
-function PersonalHull() {
-  return (
-    <>
-      <path d="M125 8 C138 26 145 50 146 78 L196 150 C205 160 205 176 190 182 L150 176 L152 250 L178 286 L150 282 L134 296 L125 286 L116 296 L100 282 L72 286 L98 250 L100 176 L60 182 C45 176 45 160 54 150 L104 78 C105 50 112 26 125 8 Z" />
-      <ellipse cx="125" cy="70" rx="13" ry="22" fill="#0a131c" stroke="#00e5ff" strokeWidth="1" />
-      <line x1="125" y1="96" x2="125" y2="250" stroke="#00e5ff" strokeWidth="0.6" opacity="0.4" />
-      <circle cx="125" cy="168" r="20" fill="#0a131c" stroke="#ffb300" strokeWidth="1" opacity="0.7" />
-      <rect x="108" y="262" width="10" height="20" rx="2" fill="#08222b" stroke="#00e5ff" strokeWidth="0.8" />
-      <rect x="132" y="262" width="10" height="20" rx="2" fill="#08222b" stroke="#00e5ff" strokeWidth="0.8" />
-    </>
-  );
-}
-
-function TransportHull() {
-  return (
-    <>
-      <path d="M125 20 L175 60 L195 140 L195 200 L175 260 L125 280 L75 260 L55 200 L55 140 L75 60 Z" />
-      <rect x="95" y="80" width="60" height="100" rx="4" fill="#0a131c" stroke="#ffb300" strokeWidth="1" opacity="0.6" />
-      <circle cx="125" cy="170" r="18" fill="#0a131c" stroke="#ffb300" strokeWidth="1" />
-      <rect x="70" y="220" width="18" height="30" rx="2" fill="#08222b" />
-      <rect x="162" y="220" width="18" height="30" rx="2" fill="#08222b" />
-    </>
-  );
-}
-
-function CorvetteHull() {
-  return (
-    <>
-      <path d="M125 10 L200 80 L220 160 L200 240 L125 290 L50 240 L30 160 L50 80 Z" />
-      <path d="M50 120 L30 160 L50 200 L70 160 Z" fill="#0a131c" opacity="0.8" />
-      <path d="M200 120 L220 160 L200 200 L180 160 Z" fill="#0a131c" opacity="0.8" />
-      <circle cx="125" cy="155" r="22" fill="#0a131c" stroke="#38ff9c" strokeWidth="1.2" />
-      <rect x="108" y="255" width="14" height="22" rx="2" fill="#08222b" />
-      <rect x="128" y="255" width="14" height="22" rx="2" fill="#08222b" />
-    </>
-  );
-}
-
-function FrigateHull() {
-  return (
-    <>
-      <path d="M125 5 L210 70 L235 150 L210 230 L125 295 L40 230 L15 150 L40 70 Z" />
-      <path d="M40 100 L15 150 L40 200 L65 150 Z" fill="#1a1030" opacity="0.9" />
-      <path d="M210 100 L235 150 L210 200 L185 150 Z" fill="#1a1030" opacity="0.9" />
-      <rect x="100" y="60" width="50" height="70" rx="3" fill="#0a131c" stroke="#e879f9" strokeWidth="1" />
-      <circle cx="125" cy="175" r="26" fill="#0a131c" stroke="#e879f9" strokeWidth="1.2" />
-      <rect x="95" y="250" width="20" height="28" rx="2" fill="#08222b" />
-      <rect x="135" y="250" width="20" height="28" rx="2" fill="#08222b" />
-    </>
   );
 }
